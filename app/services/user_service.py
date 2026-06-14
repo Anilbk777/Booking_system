@@ -89,3 +89,5 @@ class UserService:
         except Exception as e:
             logger.error(f"[UserService] Error logging in user: {str(e)}")
             raise ServiceException(str(e))
+
+
