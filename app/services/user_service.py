@@ -6,7 +6,12 @@ from app.utils.exceptions import (
 )
 from app.utils.logging import LoggerFactory
 from app.models.users_model import UserModel
-from app.core.auth import get_password_hash, verify_password, create_access_token
+from app.core.auth import (
+    get_password_hash,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+)
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -82,12 +87,15 @@ class UserService:
                     "Invalid credentials", f"Invalid password for user {user['email']}"
                 )
             token = create_access_token({"sub": str(existing_user.id)})
+            refresh_token = create_refresh_token({"sub": str(existing_user.id)})
             logger.info("[UserService] User logged in successfully")
-            return {"access_token": token, "token_type": "bearer"}
+            return {
+                "access_token": token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+            }
         except UserNotFoundException:
             raise
         except Exception as e:
             logger.error(f"[UserService] Error logging in user: {str(e)}")
             raise ServiceException(str(e))
-
-

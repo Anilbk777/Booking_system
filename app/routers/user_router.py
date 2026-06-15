@@ -32,6 +32,7 @@ async def login_user(
     user_dict = {"email": user.username, "hashed_password": user.password}
     return await user_service.login_user(user_dict)
 
+
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(current_user: CurrentUser):
     return current_user
