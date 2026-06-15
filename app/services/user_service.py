@@ -11,6 +11,7 @@ from app.core.auth import (
     verify_password,
     create_access_token,
     create_refresh_token,
+    verify_refresh_token,
 )
 
 logger = LoggerFactory.get_logger(__name__)
@@ -98,4 +99,26 @@ class UserService:
             raise
         except Exception as e:
             logger.error(f"[UserService] Error logging in user: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def refresh_token(self, refresh_token: str) -> dict:
+        logger.info("[UserService] Refreshing token")
+        try:
+            user_id = verify_refresh_token(refresh_token)
+            if not user_id:
+                raise UserNotFoundException(
+                    "Invalid credentials", "Invalid refresh token"
+                )
+            token = create_access_token({"sub": str(user_id)})
+            refresh_token = create_refresh_token({"sub": str(user_id)})
+            logger.info("[UserService] Token refreshed successfully")
+            return {
+                "access_token": token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+            }
+        except UserNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"[UserService] Error refreshing token: {str(e)}")
             raise ServiceException(str(e))
