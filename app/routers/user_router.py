@@ -33,6 +33,14 @@ async def login_user(
     return await user_service.login_user(user_dict)
 
 
+@router.post("/refresh", response_model=Token, status_code=status.HTTP_200_OK)
+async def refresh_token(
+    refresh_token: str,
+    user_service: Annotated[UserService, Depends(get_user_service)],
+):
+    return await user_service.refresh_token(refresh_token)
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(current_user: CurrentUser):
     return current_user
