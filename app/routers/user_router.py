@@ -16,6 +16,7 @@ router = APIRouter(prefix="/v1/api", tags=["Users"])
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Register a new user",
 )
 async def register_user(
     user: UserRegisterRequest,
@@ -24,7 +25,9 @@ async def register_user(
     return await user_service.register_user(user.model_dump())
 
 
-@router.post("/login", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post(
+    "/login", response_model=Token, status_code=status.HTTP_200_OK, summary="Login user"
+)
 async def login_user(
     user: Annotated[OAuth2PasswordRequestForm, Depends()],
     user_service: Annotated[UserService, Depends(get_user_service)],
@@ -33,7 +36,12 @@ async def login_user(
     return await user_service.login_user(user_dict)
 
 
-@router.post("/refresh", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post(
+    "/refresh",
+    response_model=Token,
+    status_code=status.HTTP_200_OK,
+    summary="Refresh token",
+)
 async def refresh_token(
     refresh_token: str,
     user_service: Annotated[UserService, Depends(get_user_service)],
@@ -41,6 +49,11 @@ async def refresh_token(
     return await user_service.refresh_token(refresh_token)
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get current user",
+)
 async def get_current_user(current_user: CurrentUser):
     return current_user
