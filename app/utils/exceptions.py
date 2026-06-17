@@ -51,3 +51,30 @@ class UserNotFoundException(AppBaseException):
             user_message=user_message, internal_detail=internal_detail, status_code=404
         )
 
+class TenantAlreadyExistsException(AppBaseException):
+    """Raised when a tenant with the same name already exists."""
+    def __init__(self, internal_detail: str = None):
+        super().__init__(
+            user_message="Tenant with this name already exists", internal_detail=internal_detail, status_code=400
+        )
+
+class TenantNotFoundException(AppBaseException):
+    """Raised when a tenant with the given name is not found."""
+    def __init__(self, internal_detail: str = None):
+        super().__init__(
+            user_message="Tenant not found", internal_detail=internal_detail, status_code=404
+        )
+
+class PropertyAlreadyExistsException(AppBaseException):
+    """Raised when a property with the same name already exists."""
+    def __init__(self, internal_detail: str = None):
+        super().__init__(
+            user_message="Property with this name already exists", internal_detail=internal_detail, status_code=400
+        )
+
+class PropertyNotFoundException(AppBaseException):
+    """Raised when a property with the given name is not found."""
+    def __init__(self, internal_detail: str = None):
+        super().__init__(
+            user_message="Property not found", internal_detail=internal_detail, status_code=404
+        )

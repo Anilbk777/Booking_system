@@ -5,7 +5,7 @@ from sqlalchemy import String, Boolean, DateTime
 from app.config.database_config import Base
 from typing import Optional, List
 from datetime import datetime, UTC
-
+from app.modules.pms.models.tenants_model import Tenant
 
 class User(Base):
     __tablename__ = "users"
@@ -24,6 +24,6 @@ class User(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
     # Relationships
-    owned_tenants: Mapped[List["Tenant"]] = relationship(
+    owner_tenants: Mapped[List["Tenant"]] = relationship(
         "Tenant", back_populates="owner", cascade="all, delete-orphan"
     )

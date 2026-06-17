@@ -14,7 +14,6 @@ from sqlalchemy import (
 from app.config.database_config import Base
 from typing import Optional, List
 
-from app.modules.auth.models.tenants_model import Tenant
 
 
 class Guest(Base):

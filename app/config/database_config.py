@@ -5,12 +5,12 @@ from sqlalchemy.orm import DeclarativeBase
 
 load_dotenv()
 
-database_url = os.getenv("DATABASE_URL")
+database_url = os.environ["DATABASE_URL"]
 
 engine = create_async_engine(
     database_url,
-    echo=True,
-    connect_args={"check_same_thread": False},
+    echo=False,
+    # connect_args={"check_same_thread": False},
 )
 
 AsyncSessionLocal = async_sessionmaker(

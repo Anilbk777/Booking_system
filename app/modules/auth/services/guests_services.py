@@ -23,7 +23,7 @@ class GuestService:
             raise UserAlreadyExistsException(
                 f"Guest with email {guest['email']} already exists"
             )
-        guest["hashed_password"] = self.auth_service.get_password_hash(guest["password"])
+        guest["password_hash"] = self.auth_service.get_password_hash(guest["password"])
         guest.pop("password")
         try:
             new_guest = await self.guest_repository.register_guest(guest)
