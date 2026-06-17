@@ -1,35 +1,33 @@
-from app.repository.users_repo import UserRepository
+from app.modules.auth.repositories.users_repo import UserRepository
+from app.modules.auth.models.users_model import User
+from app.modules.auth.services.auth_services import AuthService
+
 from app.utils.exceptions import (
     ServiceException,
     UserAlreadyExistsException,
     UserNotFoundException,
 )
 from app.utils.logging import LoggerFactory
-from app.models.users_model import UserModel
-from app.core.auth import (
-    get_password_hash,
-    verify_password,
-    create_access_token,
-    create_refresh_token,
-    verify_refresh_token,
-)
 
 logger = LoggerFactory.get_logger(__name__)
 
 
 class UserService:
-    def __init__(self, user_repository: UserRepository):
+    def __init__(self, user_repository: UserRepository, auth_service: AuthService):
         self.user_repository = user_repository
+        self.auth_service = auth_service
 
-    async def register_user(self, user: dict) -> UserModel:
+    async def register_user(self, user: dict) -> User:
         logger.info("[UserService] Creating user")
         existing_email = await self.user_repository.get_user_by_email(user["email"])
         if existing_email:
             raise UserAlreadyExistsException(
                 f"User with email {user['email']} already exists"
             )
-        user["hashed_password"] = get_password_hash(user["password"])
+        user["hashed_password"] = self.auth_service.get_password_hash(user["password"])
         user.pop("password")
+        user["role"] = "admin"
+
         try:
             new_user = await self.user_repository.register_user(user)
             logger.info("[UserService] User created successfully")
@@ -41,7 +39,7 @@ class UserService:
             logger.error(f"[UserService] Error creating user: {str(e)}")
             raise ServiceException(str(e))
 
-    async def get_user_by_email(self, email: str) -> UserModel:
+    async def get_user_by_email(self, email: str) -> User:
         logger.info("[UserService] Getting user by email")
         try:
             user = await self.user_repository.get_user_by_email(email)
@@ -57,7 +55,7 @@ class UserService:
             logger.error(f"[UserService] Error getting user by email: {str(e)}")
             raise ServiceException(str(e))
 
-    async def get_user_by_id(self, user_id: str) -> UserModel:
+    async def get_user_by_id(self, user_id: str) -> User:
         logger.info("[UserService] Getting user by ID")
         try:
             user = await self.user_repository.get_user_by_id(user_id)
@@ -81,14 +79,18 @@ class UserService:
                 raise UserNotFoundException(
                     "Invalid credentials", f"User with email {user['email']} not found"
                 )
-            if not verify_password(
-                user["hashed_password"], existing_user.hashed_password
+            if not self.auth_service.verify_password(
+                user["password"], existing_user.hashed_password
             ):
                 raise UserNotFoundException(
                     "Invalid credentials", f"Invalid password for user {user['email']}"
                 )
-            token = create_access_token({"sub": str(existing_user.id)})
-            refresh_token = create_refresh_token({"sub": str(existing_user.id)})
+            token = self.auth_service.create_access_token(
+                {"sub": str(existing_user.id), "role": existing_user.role}
+            )
+            refresh_token = self.auth_service.create_refresh_token(
+                {"sub": str(existing_user.id), "role": existing_user.role}
+            )
             logger.info("[UserService] User logged in successfully")
             return {
                 "access_token": token,
@@ -104,13 +106,17 @@ class UserService:
     async def refresh_token(self, refresh_token: str) -> dict:
         logger.info("[UserService] Refreshing token")
         try:
-            user_id = verify_refresh_token(refresh_token)
-            if not user_id:
+            user = self.auth_service.verify_refresh_token(refresh_token)
+            if not user:
                 raise UserNotFoundException(
                     "Invalid credentials", "Invalid refresh token"
                 )
-            token = create_access_token({"sub": str(user_id)})
-            refresh_token = create_refresh_token({"sub": str(user_id)})
+            token = self.auth_service.create_access_token(
+                {"sub": str(user["user_id"]), "role": user["role"]}
+            )
+            refresh_token = self.auth_service.create_refresh_token(
+                {"sub": str(user["user_id"]), "role": user["role"]}
+            )
             logger.info("[UserService] Token refreshed successfully")
             return {
                 "access_token": token,

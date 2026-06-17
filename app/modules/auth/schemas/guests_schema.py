@@ -1,0 +1,77 @@
+from pydantic import BaseModel, EmailStr, ConfigDict, Field, field_validator
+from datetime import datetime
+from typing import Optional, Annotated
+import re
+import uuid
+
+
+class GuestBase(BaseModel):
+    first_name: Annotated[str, Field(..., min_length=2, max_length=50)]
+    last_name: Annotated[str, Field(..., min_length=2, max_length=50)]
+    email: EmailStr
+    phone: Annotated[Optional[str], Field(default=None, min_length=10, max_length=15)]
+    nationality: Annotated[
+        Optional[str], Field(default=None, min_length=2, max_length=50)
+    ]
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        if not v.isdigit():
+            raise ValueError("Phone number must contain only digits")
+        return v
+
+    @field_validator("nationality")
+    @classmethod
+    def validate_nationality(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        if not v.isalpha():
+            raise ValueError("Nationality must contain only alphabetic characters")
+        return v
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value.isalpha():
+            raise ValueError("Name must contain only alphabetic characters")
+
+        return value
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def pre_strip_email(cls, value: str) -> str:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+
+class GuestCreate(GuestBase):
+    password: Annotated[str, Field(..., min_length=8, max_length=255)]
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+
+        if not any(char.isdigit() for char in value):
+            raise ValueError(
+                "Password must contain at least one numerical digit (0-9)."
+            )
+
+        # Regex scans for standard special punctuation symbols
+        special_char_regex = re.compile(r"[!@#$%^&*(),.?\":{}|<>_+\-=~`[\]\\]")
+        if not special_char_regex.search(value):
+            raise ValueError("Password must contain at least one special character.")
+
+        return value
+
+
+class GuestResponse(GuestBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    created_at: datetime

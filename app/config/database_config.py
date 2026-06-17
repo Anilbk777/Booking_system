@@ -9,7 +9,7 @@ database_url = os.getenv("DATABASE_URL")
 
 engine = create_async_engine(
     database_url,
-    echo=False,
+    echo=True,
     connect_args={"check_same_thread": False},
 )
 

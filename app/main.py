@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from app.models import users_model
 from app.config.database_config import Base, engine
 from app.utils.exception_handlers import register_exception_handlers
-from app.routers.user_router import router as user_router
 from fastapi.middleware.cors import CORSMiddleware
+from app.modules.auth.routers.guests_router import router as guest_router
+from app.modules.auth.routers.users_router import router as user_router
+from app.modules.auth.models import *
 
 
 @asynccontextmanager
@@ -18,9 +19,12 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan, title="StayEasy API", version="1.0.0", root_path="/api/v1"
+)
 register_exception_handlers(app)
 
+app.include_router(guest_router)
 app.include_router(user_router)
 
 app.add_middleware(
@@ -31,9 +35,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to the Easy Booking System API"}
+
 
 @app.get("/health")
 async def health_check():
