@@ -58,6 +58,13 @@ class TenantAlreadyExistsException(AppBaseException):
             user_message="Tenant with this name already exists", internal_detail=internal_detail, status_code=400
         )
 
+class TenantSlugAlreadyExistsException(AppBaseException):
+    """Raised when a tenant with the same slug already exists."""
+    def __init__(self, internal_detail: str = None):
+        super().__init__(
+            user_message="Tenant with this name or slug already exists", internal_detail=internal_detail, status_code=400
+        )
+
 class TenantNotFoundException(AppBaseException):
     """Raised when a tenant with the given name is not found."""
     def __init__(self, internal_detail: str = None):

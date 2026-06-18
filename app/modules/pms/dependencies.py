@@ -7,11 +7,9 @@ from app.config.database_config import get_db
 from fastapi import Depends
 
 
-async def get_tenant_service(db=Depends(get_db)) -> TenantService:
+def get_tenant_service(db=Depends(get_db)) -> TenantService:
     return TenantService(tenant_repo=TenantRepository(db=db))
 
 
-async def get_property_service(db=Depends(get_db)) -> PropertyService:
-    return PropertyService(
-        property_repo=PropertyRepository(db=db), tenant_service=get_tenant_service(db)
-    )
+def get_property_service(db=Depends(get_db)) -> PropertyService:
+    return PropertyService(property_repository=PropertyRepository(db=db))

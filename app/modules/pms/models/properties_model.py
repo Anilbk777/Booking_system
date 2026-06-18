@@ -81,9 +81,9 @@ class Property(Base):
     room_units: Mapped[List["RoomUnit"]] = relationship(
         "PropertyRoomUnit", back_populates="property", cascade="all, delete-orphan"
     )
-    # rate_plans: Mapped[List["RatePlan"]] = relationship(
-    #     "RatePlan", back_populates="property", cascade="all, delete-orphan"
-    # )
+    rate_plans: Mapped[List["RatePlan"]] = relationship(
+        "RatePlan", back_populates="property", cascade="all, delete-orphan"
+    )
 
 
 class PropertyAmenity(Base):

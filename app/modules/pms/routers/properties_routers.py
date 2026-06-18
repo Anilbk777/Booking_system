@@ -13,18 +13,24 @@ router = APIRouter(prefix="/pms", tags=["Property Management System"])
 )
 async def create_property(
     property: PropertyCreate,
-    current_user : CurrentUser,
+    current_user: CurrentUser,
     property_service: PropertyService = Depends(get_property_service),
 ):
-    return await property_service.create_property(property, current_user.id)
+    return await property_service.create_property(
+        property.model_dump(), current_user.tenant_id
+    )
 
 
 @router.get(
-    "/properties/{property_id}", response_model=PropertyResponse, status_code=status.HTTP_200_OK
+    "/properties/{property_id}",
+    response_model=PropertyResponse,
+    status_code=status.HTTP_200_OK,
 )
 async def get_property(
     property_id: uuid.UUID,
-    current_user : CurrentUser,
+    current_user: CurrentUser,
     property_service: PropertyService = Depends(get_property_service),
 ):
-    return await property_service.get_property_by_id(property_id, current_user.id)
+    return await property_service.get_property_by_id(
+        property_id, current_user.tenant_id
+    )

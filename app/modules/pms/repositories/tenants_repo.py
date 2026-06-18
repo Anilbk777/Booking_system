@@ -1,6 +1,7 @@
 from app.modules.pms.models.tenants_model import Tenant
+from app.modules.auth.models.users_model import User
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, or_, func, update
 
 from app.utils.exceptions import RepositoryException
 from app.utils.logging import LoggerFactory
@@ -41,10 +42,12 @@ class TenantRepository:
             logger.error(f"[TenantsRepoitory] Error getting tenant by id: {str(e)}")
             raise RepositoryException(str(e))
 
-    async def get_tenant_by_owner_id(self, owner_id:uuid.UUID) -> Tenant | None:
+    async def get_tenant_by_owner_id(self, owner_id: uuid.UUID) -> Tenant | None:
         logger.info(f"[TenantsRepoitory] Getting tenant by id: {owner_id}")
         try:
-            result = await self.db.execute(select(Tenant).where(Tenant.owner_id == owner_id))
+            result = await self.db.execute(
+                select(Tenant).where(Tenant.owner_id == owner_id)
+            )
             tenant = result.scalar_one_or_none()
             if tenant:
                 logger.info("[TenantsRepoitory] Tenant found")
@@ -55,24 +58,60 @@ class TenantRepository:
             logger.error(f"[TenantsRepoitory] Error getting tenant by id: {str(e)}")
             raise RepositoryException(str(e))
 
-
-    async def get_tenant_by_name(
-        self, tenant_name: str, owner_id: uuid.UUID
+    async def check_existing_tenant(
+        self, tenant_name: str, slug: str, owner_id: uuid.UUID
     ) -> Tenant | None:
-        logger.info(f"[TenantsRepoitory] Getting tenant by name: {tenant_name}")
+        logger.info(
+            f"[TenantsRepository] Checking existence for tenant name: '{tenant_name}' or slug: '{slug}'"
+        )
+
+        try:
+            query = select(Tenant).where(
+                Tenant.owner_id == owner_id,
+                or_(
+                    func.lower(Tenant.name) == tenant_name.lower(),
+                    func.lower(Tenant.slug) == slug.lower(),
+                ),
+            )
+
+            result = await self.db.execute(query)
+            tenant = result.scalar_one_or_none()
+
+            if tenant:
+                logger.info(
+                    "[TenantsRepository] Conflict found: Tenant with this name or slug already exists."
+                )
+            else:
+                logger.debug(
+                    "[TenantsRepository] No matching tenant found. Safe to proceed."
+                )
+
+            return tenant
+
+        except Exception as e:
+            logger.error(
+                f"[TenantsRepository] Database failure during tenant lookup: {str(e)}"
+            )
+            raise RepositoryException(
+                "A database error occurred while verifying tenant information."
+            )
+
+    async def update_user_tenant_id(
+        self, user_id: uuid.UUID, tenant_id: uuid.UUID
+    ) -> bool:
+        logger.info(f"[TenantsRepoitory] Updating tenant id for user: {user_id}")
         try:
             result = await self.db.execute(
-                select(Tenant).where(
-                    func.lower(Tenant.name) == tenant_name.lower(),
-                    Tenant.owner_id == owner_id,
-                )
+                update(User).where(User.id == user_id).values(tenant_id=tenant_id)
             )
-            tenant = result.scalar_one_or_none()
-            if tenant:
-                logger.info("[TenantsRepoitory] Tenant found")
+            await self.db.commit()
+            if result.rowcount == 1:
+                logger.info("[TenantsRepoitory] User updated successfully")
+                return True
             else:
-                logger.error("[TenantsRepoitory] Tenant not found")
-            return tenant
+                logger.error("[TenantsRepoitory] User not found")
+                return False
         except Exception as e:
-            logger.error(f"[TenantsRepoitory] Error getting tenant by name: {str(e)}")
+            logger.error(f"[TenantsRepoitory] Error updating user: {str(e)}")
+            await self.db.rollback()
             raise RepositoryException(str(e))

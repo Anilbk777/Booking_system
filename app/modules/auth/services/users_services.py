@@ -8,7 +8,7 @@ from app.utils.exceptions import (
     UserNotFoundException,
 )
 from app.utils.logging import LoggerFactory
-
+import uuid
 logger = LoggerFactory.get_logger(__name__)
 
 
@@ -127,4 +127,22 @@ class UserService:
             raise
         except Exception as e:
             logger.error(f"[UserService] Error refreshing token: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def update_user_tenant_id(self, user_id: str, tenant_id: uuid.UUID) -> bool:
+        logger.info(f"[UserService] Updating tenant id for user: {user_id}")
+        try:
+            user = await self.user_repository.get_user_by_id(user_id)
+            if not user:
+                raise UserNotFoundException(
+                    "User not found", f"User with ID {user_id} not found"
+                )
+            user.tenant_id = tenant_id
+            await self.user_repository.update_user_tenant_id(user)
+            logger.info("[UserService] Tenant id updated successfully")
+            return True
+        except UserNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"[UserService] Error updating tenant id: {str(e)}")
             raise ServiceException(str(e))

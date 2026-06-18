@@ -13,7 +13,9 @@ async def create_tenant(
     current_user: CurrentUser,
     tenant_service: TenantService = Depends(get_tenant_service),
 ):
-    return await tenant_service.create_tenant(tenant.model_dump(), current_user.id)
+    new_tenant= await tenant_service.create_tenant(tenant.model_dump(), current_user.id)
+    await tenant_service.update_user_tenant_id(current_user.id, new_tenant.id)
+    return new_tenant
 
 
 @router.get("/{tenant_id}", response_model=TenantResponseSchema)

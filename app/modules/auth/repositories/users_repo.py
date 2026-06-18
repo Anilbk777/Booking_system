@@ -48,3 +48,5 @@ class UserRepository:
         except Exception as e:
             logger.error(f"[UserRepository] Error getting user by ID: {str(e)}")
             raise RepositoryException(str(e))
+
+   

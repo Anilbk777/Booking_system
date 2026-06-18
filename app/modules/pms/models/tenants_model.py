@@ -48,7 +48,17 @@ class Tenant(Base):
     __table_args__ = (
         UniqueConstraint("owner_id", "name", name="uq_tenant_owner_name"),
     )
-    owner: Mapped["User"] = relationship("User", back_populates="owner_tenants")
+    # --- Relationships ---
+    # 1. The specific Admin who created/owns this workspace
+    owner: Mapped["User"] = relationship(
+        "User", foreign_keys=[owner_id], back_populates="owned_tenants"
+    )
+    
+    # 2. All the users (Admins, Managers, Receptionists) who work in this workspace
+    staff_members: Mapped[List["User"]] = relationship(
+        "User", foreign_keys="[User.tenant_id]", back_populates="workspace", cascade="all, delete-orphan"
+    )
+    
     properties: Mapped[List["Property"]] = relationship(
         "Property", back_populates="tenant", cascade="all, delete-orphan"
     )

@@ -1,12 +1,15 @@
 from app.modules.pms.repositories.tenants_repo import TenantRepository
 from app.utils.exceptions import (
     ServiceException,
-    TenantAlreadyExistsException,
     TenantNotFoundException,
+    TenantSlugAlreadyExistsException,
+    UserNotFoundException,
 )
 from app.utils.logging import LoggerFactory
 import uuid
 from app.modules.pms.models.tenants_model import Tenant
+from app.modules.auth.services.users_services import UserService
+from app.modules.auth.dependencies import get_user_service
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -20,31 +23,33 @@ class TenantService:
         tenant_data = tenant
         tenant_data["owner_id"] = owner_id
         try:
-            existing_tenant = await self.tenant_repo.get_tenant_by_name(tenant["name"], owner_id)
+            existing_tenant = await self.tenant_repo.check_existing_tenant(
+                tenant_data["name"], tenant_data["slug"], owner_id
+            )
             if existing_tenant:
                 logger.info("[TenantService] Tenant already exists")
-                raise TenantAlreadyExistsException(
-                    f"Tenant with name {tenant_data['name']} already exists"
+                raise TenantSlugAlreadyExistsException(
+                    f"Tenant with name {tenant_data['name']} or slug {tenant_data['slug']} already exists"
                 )
             new_tenant = await self.tenant_repo.create_tenant(tenant_data)
             logger.info("[TenantService] Tenant created successfully")
             return new_tenant
 
-        except TenantAlreadyExistsException:
+        except TenantSlugAlreadyExistsException:
             raise
         except Exception as e:
             logger.error(f"[TenantService] Error creating tenant: {str(e)}")
             raise ServiceException(str(e))
 
-    async def get_tenant_by_owner_id(
-        self, owner_id: uuid.UUID
-    ) -> Tenant:
+    async def get_tenant_by_owner_id(self, owner_id: uuid.UUID) -> Tenant:
         logger.info(f"[TenantService] Getting tenant by owner id: {owner_id}")
         try:
             tenant = await self.tenant_repo.get_tenant_by_owner_id(owner_id)
             if not tenant:
                 logger.error("[TenantService] Tenant not found")
-                raise TenantNotFoundException(f"Tenant with owner id {owner_id} not found")
+                raise TenantNotFoundException(
+                    f"Tenant with owner id {owner_id} not found"
+                )
             logger.info("[TenantService] Tenant found")
             return tenant
         except TenantNotFoundException:
@@ -71,4 +76,19 @@ class TenantService:
             raise
         except Exception as e:
             logger.error(f"[TenantService] Error getting tenant by id: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def update_user_tenant_id(
+        self, user_id: uuid.UUID, tenant_id: uuid.UUID
+    ) -> bool:
+        logger.info(f"[TenantService] Updating tenant id for user: {user_id}")
+        try:
+            result = await self.tenant_repo.update_user_tenant_id(user_id, tenant_id)
+            if not result:
+                logger.error("[TenantService] Error updating tenant id")
+                raise ServiceException("Error updating tenant id")
+            logger.info("[TenantService] Tenant id updated successfully")
+            return True
+        except Exception as e:
+            logger.error(f"[TenantService] Error updating tenant id: {str(e)}")
             raise ServiceException(str(e))
