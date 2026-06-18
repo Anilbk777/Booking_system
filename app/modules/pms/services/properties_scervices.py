@@ -4,6 +4,7 @@ from app.utils.exceptions import (
     ServiceException,
     PropertyAlreadyExistsException,
     PropertyNotFoundException,
+    UnauthorizedException,
 )
 from app.utils.logging import LoggerFactory
 import uuid
@@ -44,18 +45,21 @@ class PropertyService:
     ) -> Property:
         logger.info(f"[PropertyService] Getting property by id: {property_id}")
         try:
-            property = await self.property_repository.get_property_by_id(property_id)
+            property = await self.property_repository.get_property_by_id(
+                property_id, tenant_id
+            )
             if not property:
                 raise PropertyNotFoundException(
                     f"Property with id {property_id} not found"
                 )
             if property.tenant_id != tenant_id:
-                raise PropertyNotFoundException(
+                raise UnauthorizedException(
                     f"Property does not belong to the tenant {tenant_id}"
                 )
             logger.info("[PropertyService] Property found successfully")
             return property
-        except PropertyNotFoundException:
+        except (PropertyNotFoundException, UnauthorizedException) as e:
+            logger.error(f"[PropertyService] Error getting property by id: {str(e)}")
             raise
         except Exception as e:
             logger.error(f"[PropertyService] Error getting property by id: {str(e)}")

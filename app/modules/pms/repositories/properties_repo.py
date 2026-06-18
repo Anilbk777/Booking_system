@@ -28,11 +28,16 @@ class PropertyRepository:
             raise RepositoryException(str(e))
 
     async def get_property_by_id(
-        self, property_id: uuid.UUID
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID
     ) -> Property | None:
         logger.info(f"[PropertyRepository] Getting property by id: {property_id}")
         try:
-            result = await self.db.execute(select(Property).where(Property.id == property_id))
+            result = await self.db.execute(
+                select(Property).where(
+                    Property.id == property_id,
+                    Property.tenant_id == tenant_id,
+                )
+            )
             property = result.scalar_one_or_none()
             if property:
                 logger.info("[PropertyRepository] Property found")

@@ -85,3 +85,10 @@ class PropertyNotFoundException(AppBaseException):
         super().__init__(
             user_message="Property not found", internal_detail=internal_detail, status_code=404
         )
+
+class UnauthorizedException(AppBaseException):
+    """Raised when a user is not authorized to perform an action."""
+    def __init__(self, internal_detail: str = None):
+        super().__init__(
+            user_message="You are not authorized to perform this action", internal_detail=internal_detail, status_code=401
+        )
