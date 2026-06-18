@@ -57,7 +57,7 @@ class RoomType(Base):
         nullable=False,
     )
     name: Mapped[RoomTypes] = mapped_column(
-        SqlEnum(RoomTypes), nullable=False, default=RoomTypes.STANDARD
+        SqlEnum(RoomTypes, native_enum=False, length=50), nullable=False, default=RoomTypes.STANDARD
     )
     description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     max_occupancy: Mapped[int] = mapped_column(
@@ -69,7 +69,7 @@ class RoomType(Base):
         nullable=False,
     )
     bed_type: Mapped[BedType] = mapped_column(
-        SqlEnum(BedType), nullable=False, default=BedType.SINGLE
+        SqlEnum(BedType, native_enum=False, length=50), nullable=False, default=BedType.SINGLE
     )
     base_rate: Mapped[float] = mapped_column(
         Numeric(10, 2),
@@ -110,7 +110,7 @@ class PropertyRoomUnit(Base):
     room_number: Mapped[str] = mapped_column(String(20), nullable=False)
     floor: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     status: Mapped[RoomStatus] = mapped_column(
-        SqlEnum(RoomStatus), default=RoomStatus.AVAILABLE, nullable=False
+        SqlEnum(RoomStatus, native_enum=False, length=50), default=RoomStatus.AVAILABLE, nullable=False
     )
     smoking: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     accessible: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

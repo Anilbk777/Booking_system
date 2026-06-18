@@ -1,8 +1,8 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import uuid
-from typing import Optional
+from typing import Optional, List
 from datetime import time, datetime
-from app.modules.pms.models.properties_model import PropertyType
+from app.modules.pms.models.properties_model import PropertyType, AmenityType
 
 
 class PropertyBase(BaseModel):
@@ -43,6 +43,26 @@ class PropertyCreate(PropertyBase):
 class PropertyResponse(PropertyBase):
     id: uuid.UUID
     tenant_id: uuid.UUID
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PropertyAmenityBase(BaseModel):
+    amenity: List[AmenityType] = Field(
+        default_factory=list,
+        description="List of amenities in the property. Can be empty.",
+        examples=[["Pool", "Gym", "Parking"]],
+    )
+
+
+class PropertyAmenityCreate(PropertyAmenityBase):
+    pass
+
+
+class PropertyAmenityResponse(PropertyAmenityBase):
+    id: uuid.UUID
+    property_id: uuid.UUID
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,4 +1,4 @@
-from app.modules.pms.models.properties_model import Property
+from app.modules.pms.models.properties_model import Property, PropertyAmenity
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -62,4 +62,36 @@ class PropertyRepository:
             return property
         except Exception as e:
             logger.error(f"[PropertyRepository] Error getting property by name: {str(e)}")
+            raise RepositoryException(str(e))
+
+    async def create_amenity(self, amenity: dict) -> PropertyAmenity:
+        logger.info(f"[PropertyRepository] Creating amenity: {amenity}")
+        try:
+            new_amenity = PropertyAmenity(**amenity)
+            self.db.add(new_amenity)
+            await self.db.commit()
+            await self.db.refresh(new_amenity)
+            logger.info("[PropertyRepository] Amenity created successfully")
+            return new_amenity
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[PropertyRepository] Error creating amenity: {str(e)}")
+            raise RepositoryException(str(e))
+
+    async def get_amenity_by_id(
+        self, property_id: uuid.UUID
+    ) -> PropertyAmenity | None:
+        logger.info(f"[PropertyRepository] Getting amenity by id: {property_id}")
+        try:
+            result = await self.db.execute(
+                select(PropertyAmenity).where(PropertyAmenity.property_id == property_id)
+            )
+            amenity = result.scalar_one_or_none()
+            if amenity:
+                logger.info("[PropertyRepository] Amenity found")
+            else:
+                logger.error("[PropertyRepository] Amenity not found")
+            return amenity
+        except Exception as e:
+            logger.error(f"[PropertyRepository] Error getting amenity by id: {str(e)}")
             raise RepositoryException(str(e))

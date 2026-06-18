@@ -50,7 +50,7 @@ class Property(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[PropertyType] = mapped_column(
-        SqlEnum(PropertyType), nullable=False, default=PropertyType.HOTEL
+        SqlEnum(PropertyType, native_enum=False, length=50), nullable=False, default=PropertyType.HOTEL
     )
     country: Mapped[str] = mapped_column(String(255), nullable=False)
     state: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -72,8 +72,11 @@ class Property(Base):
 
     # Relationships
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="properties")
-    amenities: Mapped[List["PropertyAmenity"]] = relationship(
-        "PropertyAmenity", back_populates="property", cascade="all, delete-orphan"
+    amenities: Mapped[Optional["PropertyAmenity"]] = relationship(
+        "PropertyAmenity",
+        back_populates="property",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
     room_types: Mapped[List["RoomType"]] = relationship(
         "RoomType", back_populates="property", cascade="all, delete-orphan"
@@ -95,11 +98,15 @@ class PropertyAmenity(Base):
     property_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("properties.id", ondelete="CASCADE"),
+        unique=True,
         index=True,
         nullable=False,
     )
     amenity: Mapped[List[AmenityType]] = mapped_column(
-        ARRAY(SqlEnum(AmenityType, native_enum=False)), nullable=False, default=list
+        ARRAY(SqlEnum(AmenityType, native_enum=False, length=100)), nullable=False, default=list
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
     # Relationships

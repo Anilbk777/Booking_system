@@ -19,11 +19,12 @@ class TenantBase(BaseModel):
     @classmethod
     def validate_timezone(cls, value: str) -> str:
         try:
-            # ZoneInfo verifies against the standard IANA timezone database
             ZoneInfo(value)
             return value
         except Exception:
-            raise ValueError(f"'{value}' is not a valid IANA timezone name (e.g., 'Asia/Kathmandu')")
+            raise ValueError(
+                f"'{value}' is not a valid IANA timezone name (e.g., 'Asia/Kathmandu')"
+            )
 
 
 class TenantCreateSchema(TenantBase):

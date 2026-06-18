@@ -3,13 +3,10 @@ from app.utils.exceptions import (
     ServiceException,
     TenantNotFoundException,
     TenantSlugAlreadyExistsException,
-    UserNotFoundException,
 )
 from app.utils.logging import LoggerFactory
 import uuid
 from app.modules.pms.models.tenants_model import Tenant
-from app.modules.auth.services.users_services import UserService
-from app.modules.auth.dependencies import get_user_service
 
 logger = LoggerFactory.get_logger(__name__)
 

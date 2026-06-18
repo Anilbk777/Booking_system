@@ -1,5 +1,10 @@
 from fastapi import APIRouter, Depends, status
-from app.modules.pms.schemas.properties_schemas import PropertyCreate, PropertyResponse
+from app.modules.pms.schemas.properties_schemas import (
+    PropertyCreate,
+    PropertyResponse,
+    PropertyAmenityCreate,
+    PropertyAmenityResponse,
+)
 from app.modules.pms.services.properties_scervices import PropertyService
 from app.modules.pms.dependencies import get_property_service
 from app.modules.auth.auth_middlewares import CurrentUser
@@ -34,3 +39,32 @@ async def get_property(
     return await property_service.get_property_by_id(
         property_id, current_user.tenant_id
     )
+
+
+@router.post(
+    "/properties/{property_id}/amenities",
+    response_model=PropertyAmenityResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_amenity(
+    amenity: PropertyAmenityCreate,
+    property_id: uuid.UUID,
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    return await property_service.create_amenity(
+        amenity.model_dump(), current_user.tenant_id, property_id
+    )
+
+
+@router.get(
+    "/properties/{property_id}/amenities",
+    response_model=PropertyAmenityResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_amenity(
+    property_id: uuid.UUID,
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    return await property_service.get_amenity_by_id(property_id)
