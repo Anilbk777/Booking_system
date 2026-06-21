@@ -18,6 +18,8 @@ class PropertyBase(BaseModel):
     lat: Optional[float] = Field(None, description="Latitude of the property")
     lng: Optional[float] = Field(None, description="Longitude of the property")
     star_rating: Optional[int] = Field(None, description="Star rating of the property")
+    description: Optional[str] = Field(None, description="Detailed description of the property")
+    is_active: bool = Field(default=True, description="Whether the property is active")
 
     check_in_time: Optional[time] = Field(
         default=time(14, 00), description="Check-in time of the property"
@@ -38,6 +40,23 @@ class PropertyBase(BaseModel):
 
 class PropertyCreate(PropertyBase):
     pass
+
+
+class PropertyUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=100)
+    type: Optional[PropertyType] = None
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    zip_code: Optional[str] = None
+    address: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    star_rating: Optional[int] = None
+    check_in_time: Optional[time] = None
+    check_out_time: Optional[time] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class PropertyResponse(PropertyBase):

@@ -89,3 +89,32 @@ class TenantService:
         except Exception as e:
             logger.error(f"[TenantService] Error updating tenant id: {str(e)}")
             raise ServiceException(str(e))
+
+    async def update_tenant(self, tenant_id: uuid.UUID, owner_id: uuid.UUID, data: dict) -> Tenant:
+        logger.info(f"[TenantService] Updating tenant: {tenant_id}")
+        try:
+            tenant = await self.tenant_repo.get_tenant_by_id(tenant_id)
+            if not tenant or tenant.owner_id != owner_id:
+                raise TenantNotFoundException(f"Tenant {tenant_id} not found")
+            
+            updated = await self.tenant_repo.update_tenant(tenant_id, data)
+            return updated
+        except TenantNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"[TenantService] Error updating tenant: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def delete_tenant(self, tenant_id: uuid.UUID, owner_id: uuid.UUID) -> bool:
+        logger.info(f"[TenantService] Deleting tenant: {tenant_id}")
+        try:
+            tenant = await self.tenant_repo.get_tenant_by_id(tenant_id)
+            if not tenant or tenant.owner_id != owner_id:
+                raise TenantNotFoundException(f"Tenant {tenant_id} not found")
+            
+            return await self.tenant_repo.delete_tenant(tenant_id)
+        except TenantNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"[TenantService] Error deleting tenant: {str(e)}")
+            raise ServiceException(str(e))

@@ -4,20 +4,40 @@ from app.modules.auth.dependencies import get_guest_service
 from app.modules.auth.schemas.guests_schema import GuestCreate, GuestResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import Annotated
-from app.modules.auth.schemas.token_schema import Token
+from app.modules.auth.schemas.token_schema import Token, VerifyOTP, ResendOTP,RefreshTokenRequest
 from app.modules.auth.auth_middlewares import CurrentGuest
 
 router = APIRouter(prefix="/auth/guests", tags=["guests"])
 
 
-@router.post(
-    "/register", response_model=GuestResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_guest(
     guest: GuestCreate,
     guest_service: Annotated[GuestService, Depends(get_guest_service)],
 ):
-    return await guest_service.register_guest(guest.model_dump())
+    guest_data = await guest_service.register_guest(guest.model_dump())
+    return {
+        "message": "Guest registered successfully. Please verify your email.",
+        "guest_id": guest_data.id,
+        "email": guest_data.email,
+    }
+
+
+@router.post("/verify-otp", response_model=Token, status_code=status.HTTP_200_OK)
+async def verify_otp(
+    otp: VerifyOTP,
+    guest_service: Annotated[GuestService, Depends(get_guest_service)],
+):
+    return await guest_service.verify_registration_otp(otp.email, otp.otp)
+
+
+@router.post("/resend-otp", status_code=status.HTTP_200_OK)
+async def resend_otp(
+    resend_data: ResendOTP,
+    guest_service: Annotated[GuestService, Depends(get_guest_service)],
+):
+    await guest_service.resend_registration_otp(resend_data.email)
+    return {"message": "Verification code resent successfully."}
 
 
 @router.post("/login", response_model=Token, status_code=status.HTTP_200_OK)
@@ -31,7 +51,7 @@ async def login_guest(
 
 @router.post("/refresh", response_model=Token, status_code=status.HTTP_200_OK)
 async def refresh_token(
-    refresh_token: str,
+    refresh_token: RefreshTokenRequest,
     guest_service: Annotated[GuestService, Depends(get_guest_service)],
 ):
     return await guest_service.refresh_token(refresh_token)

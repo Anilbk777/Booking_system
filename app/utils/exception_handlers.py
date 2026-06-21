@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
 from app.utils.logging import LoggerFactory
 from app.utils.exceptions import AppBaseException
 
@@ -82,6 +83,27 @@ async def handle_http_exception(request: Request, exc: HTTPException):
     )
 
 
+# ── 5. Database Integrity Error (Conflicts / FK failures) ──────────
+@app.exception_handler(IntegrityError)
+async def handle_integrity_error(request: Request, exc: IntegrityError):
+    logger.warning(
+        "[IntegrityError] %s | path=%s",
+        str(exc),
+        request.url.path,
+    )
+    # Extract useful part of the error if possible (e.g. duplicate key)
+    error_msg = "A database conflict occurred (e.g. duplicate entry or invalid reference)."
+    if "UNIQUE constraint failed" in str(exc):
+        error_msg = "An entry with this name or unique identifier already exists."
+    elif "FOREIGN KEY constraint failed" in str(exc):
+        error_msg = "Invalid reference: one of the related records does not exist."
+
+    return JSONResponse(
+        status_code=400,
+        content={"error": error_msg},
+    )
+
+
 # ── 5. Catch-all safety net ───────────────────────────────────────
 @app.exception_handler(Exception)
 async def handle_unexpected_exception(request: Request, exc: Exception):
@@ -102,4 +124,5 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, handle_request_validation_error)
     app.add_exception_handler(ValidationError, handle_pydantic_validation_error)
     app.add_exception_handler(HTTPException, handle_http_exception)
+    app.add_exception_handler(IntegrityError, handle_integrity_error)
     app.add_exception_handler(Exception, handle_unexpected_exception)

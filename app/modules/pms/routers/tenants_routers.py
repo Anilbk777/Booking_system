@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, status
+import uuid
 from app.modules.auth.auth_middlewares import CurrentUser
 from app.modules.pms.schemas.tenant_scheams import (
     TenantCreateSchema,
     TenantResponseSchema,
+    TenantUpdateSchema,
 )
 from app.modules.pms.services.tenant_services import TenantService
 from app.modules.pms.dependencies import get_tenant_service
-
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
 
@@ -33,3 +34,25 @@ async def create_tenant(
     )
     await tenant_service.update_user_tenant_id(current_user.id, new_tenant.id)
     return new_tenant
+
+
+@router.put("/{tenant_id}", response_model=TenantResponseSchema)
+async def update_tenant(
+    tenant_id: uuid.UUID,
+    tenant_data: TenantUpdateSchema,
+    current_user: CurrentUser,
+    tenant_service: TenantService = Depends(get_tenant_service),
+):
+    return await tenant_service.update_tenant(
+        tenant_id, current_user.id, tenant_data.model_dump(exclude_unset=True)
+    )
+
+
+@router.delete("/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_tenant(
+    tenant_id: uuid.UUID,
+    current_user: CurrentUser,
+    tenant_service: TenantService = Depends(get_tenant_service),
+):
+    await tenant_service.delete_tenant(tenant_id, current_user.id)
+    return None

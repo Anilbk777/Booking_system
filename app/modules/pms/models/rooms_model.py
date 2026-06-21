@@ -81,11 +81,15 @@ class RoomType(Base):
         nullable=True,
         default=list,
     )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Relationships
     property: Mapped["Property"] = relationship("Property", back_populates="room_types")
     room_units: Mapped[List["RoomUnit"]] = relationship(
         "PropertyRoomUnit", back_populates="room_type", cascade="all, delete-orphan"
+    )
+    rate_plans: Mapped[List["RatePlan"]] = relationship(
+        "RatePlan", back_populates="room_type", cascade="all, delete-orphan"
     )
 
 
@@ -159,9 +163,14 @@ class RatePlan(Base):
     )
 
     price_per_night: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    min_stay_nights: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    cancellation_policy: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
     # Relationships
     property: Mapped["Property"] = relationship("Property", back_populates="rate_plans")
+    room_type: Mapped["RoomType"] = relationship(
+        "RoomType", back_populates="rate_plans"
+    )
 
 
 class DateOverride(Base):
@@ -191,6 +200,7 @@ class DateOverride(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     override_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    is_closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class DiscountCode(Base):

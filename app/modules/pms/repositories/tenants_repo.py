@@ -1,7 +1,7 @@
 from app.modules.pms.models.tenants_model import Tenant
 from app.modules.auth.models.users_model import User
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func, update
+from sqlalchemy import select, or_, func, update, delete
 
 from app.utils.exceptions import RepositoryException
 from app.utils.logging import LoggerFactory
@@ -115,3 +115,32 @@ class TenantRepository:
             logger.error(f"[TenantsRepoitory] Error updating user: {str(e)}")
             await self.db.rollback()
             raise RepositoryException(str(e))
+
+    async def update_tenant(self, tenant_id: uuid.UUID, data: dict) -> Tenant | None:
+        logger.info(f"[TenantsRepoitory] Updating tenant: {tenant_id}")
+        try:
+            query = update(Tenant).where(Tenant.id == tenant_id).values(**data).returning(Tenant)
+            result = await self.db.execute(query)
+            await self.db.commit()
+            return result.scalar_one_or_none()
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[TenantsRepoitory] Error updating tenant: {str(e)}")
+            raise RepositoryException(str(e))
+
+    async def delete_tenant(self, tenant_id: uuid.UUID) -> bool:
+        logger.info(f"[TenantsRepoitory] Deleting tenant: {tenant_id}")
+        try:
+            query = delete(Tenant).where(Tenant.id == tenant_id)
+            result = await self.db.execute(query)
+            await self.db.commit()
+            return result.rowcount > 0
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[TenantsRepoitory] Error deleting tenant: {str(e)}")
+            raise RepositoryException(str(e))
+
+    async def list_tenants(self) -> list[Tenant]:
+        # For superadmin use
+        result = await self.db.execute(select(Tenant))
+        return result.scalars().all()

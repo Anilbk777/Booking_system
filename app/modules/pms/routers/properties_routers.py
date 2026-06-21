@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from app.modules.pms.schemas.properties_schemas import (
     PropertyCreate,
+    PropertyUpdate,
     PropertyResponse,
     PropertyAmenityCreate,
     PropertyAmenityResponse,
@@ -39,6 +40,42 @@ async def get_property(
     return await property_service.get_property_by_id(
         property_id, current_user.tenant_id
     )
+
+
+@router.get(
+    "/properties", response_model=list[PropertyResponse], status_code=status.HTTP_200_OK
+)
+async def list_properties(
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    return await property_service.list_properties(current_user.tenant_id)
+
+
+@router.put(
+    "/properties/{property_id}",
+    response_model=PropertyResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def update_property(
+    property_id: uuid.UUID,
+    property_data: PropertyUpdate,
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    return await property_service.update_property(
+        property_id, current_user.tenant_id, property_data.model_dump(exclude_unset=True)
+    )
+
+
+@router.delete("/properties/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_property(
+    property_id: uuid.UUID,
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    await property_service.delete_property(property_id, current_user.tenant_id)
+    return None
 
 
 @router.post(

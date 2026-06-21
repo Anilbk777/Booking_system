@@ -15,11 +15,16 @@ class AppBaseException(Exception):
 class RepositoryException(AppBaseException):
     """Raised when database/repository operations fail."""
 
-    def __init__(self, internal_detail: str):
+    def __init__(
+        self,
+        user_message: str = "A data access error occurred. Please try again later.",
+        internal_detail: str = None,
+        status_code: int = 500,
+    ):
         super().__init__(
-            user_message="A data access error occurred. Please try again later.",
+            user_message=user_message,
             internal_detail=internal_detail,
-            status_code=500,
+            status_code=status_code,
         )
 
 
@@ -39,7 +44,42 @@ class UserAlreadyExistsException(AppBaseException):
 
     def __init__(self, user_message: str):
         super().__init__(
-            user_message=user_message, internal_detail=user_message, status_code=400
+            user_message=user_message, internal_detail=user_message, status_code=409
+        )
+
+
+class AccountInactiveException(AppBaseException):
+    """Raised when a user account is inactive."""
+
+    def __init__(self, user_message: str, internal_detail: str = None):
+        super().__init__(
+            user_message=user_message, internal_detail=internal_detail, status_code=400
+        )
+
+
+class AccountActiveException(AppBaseException):
+    """Raised when a user account is active."""
+
+    def __init__(self, user_message: str, internal_detail: str = None):
+        super().__init__(
+            user_message=user_message, internal_detail=internal_detail, status_code=400
+        )
+
+
+class InvalidOTPException(AppBaseException):
+    """Raised when an OTP is invalid or expired."""
+
+    def __init__(self, user_message: str, internal_detail: str = None):
+        super().__init__(
+            user_message=user_message, internal_detail=internal_detail, status_code=400
+        )
+
+class InvalidRefreshTokenException(AppBaseException):
+    """Raised when a refresh token is invalid or expired."""
+
+    def __init__(self, user_message: str, internal_detail: str = None):
+        super().__init__(
+            user_message=user_message, internal_detail=internal_detail, status_code=401
         )
 
 
@@ -51,44 +91,95 @@ class UserNotFoundException(AppBaseException):
             user_message=user_message, internal_detail=internal_detail, status_code=404
         )
 
+
 class TenantAlreadyExistsException(AppBaseException):
     """Raised when a tenant with the same name already exists."""
+
     def __init__(self, internal_detail: str = None):
         super().__init__(
-            user_message="Tenant with this name already exists", internal_detail=internal_detail, status_code=400
+            user_message="Tenant with this name already exists",
+            internal_detail=internal_detail,
+            status_code=400,
         )
+
 
 class TenantSlugAlreadyExistsException(AppBaseException):
     """Raised when a tenant with the same slug already exists."""
+
     def __init__(self, internal_detail: str = None):
         super().__init__(
-            user_message="Tenant with this name or slug already exists", internal_detail=internal_detail, status_code=400
+            user_message="Tenant with this name or slug already exists",
+            internal_detail=internal_detail,
+            status_code=400,
         )
+
 
 class TenantNotFoundException(AppBaseException):
     """Raised when a tenant with the given name is not found."""
+
     def __init__(self, internal_detail: str = None):
         super().__init__(
-            user_message="Tenant not found", internal_detail=internal_detail, status_code=404
+            user_message="Tenant not found",
+            internal_detail=internal_detail,
+            status_code=404,
         )
+
 
 class PropertyAlreadyExistsException(AppBaseException):
     """Raised when a property with the same name already exists."""
+
     def __init__(self, internal_detail: str = None):
         super().__init__(
-            user_message="Property with this name already exists", internal_detail=internal_detail, status_code=400
+            user_message="Property with this name already exists",
+            internal_detail=internal_detail,
+            status_code=400,
         )
+
 
 class PropertyNotFoundException(AppBaseException):
     """Raised when a property with the given name is not found."""
+
     def __init__(self, internal_detail: str = None):
         super().__init__(
-            user_message="Property not found", internal_detail=internal_detail, status_code=404
+            user_message="Property not found",
+            internal_detail=internal_detail,
+            status_code=404,
         )
+
 
 class UnauthorizedException(AppBaseException):
     """Raised when a user is not authorized to perform an action."""
+
     def __init__(self, internal_detail: str = None):
         super().__init__(
-            user_message="You are not authorized to perform this action", internal_detail=internal_detail, status_code=401
+            user_message="You are not authorized to perform this action",
+            internal_detail=internal_detail,
+            status_code=401,
+        )
+
+
+class RoomTypeNotFoundException(AppBaseException):
+    def __init__(self, internal_detail: str = None):
+        super().__init__(
+            user_message="Room type not found",
+            internal_detail=internal_detail,
+            status_code=404,
+        )
+
+
+class RatePlanNotFoundException(AppBaseException):
+    def __init__(self, internal_detail: str = None):
+        super().__init__(
+            user_message="Rate plan not found",
+            internal_detail=internal_detail,
+            status_code=404,
+        )
+
+
+class ResourceConflictException(AppBaseException):
+    """Raised for duplicate entries or constraint violations."""
+
+    def __init__(self, user_message: str, internal_detail: str = None):
+        super().__init__(
+            user_message=user_message, internal_detail=internal_detail, status_code=400
         )

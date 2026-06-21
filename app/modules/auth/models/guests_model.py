@@ -15,7 +15,6 @@ from app.config.database_config import Base
 from typing import Optional, List
 
 
-
 class Guest(Base):
     """Global Registry for consumers supporting decentralized Multi-Tenant Single Sign-On (SSO)."""
 
@@ -31,7 +30,7 @@ class Guest(Base):
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     nationality: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

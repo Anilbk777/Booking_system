@@ -95,3 +95,43 @@ class PropertyService:
         except Exception as e:
             logger.error(f"[PropertyService] Error getting amenity by id: {str(e)}")
             raise ServiceException(str(e))
+
+    async def list_properties(self, tenant_id: uuid.UUID) -> list[Property]:
+        logger.info(f"[PropertyService] Listing properties for tenant: {tenant_id}")
+        try:
+            return await self.property_repository.list_properties(tenant_id)
+        except Exception as e:
+            logger.error(f"[PropertyService] Error listing properties: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def update_property(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID, property_data: dict
+    ) -> Property:
+        logger.info(f"[PropertyService] Updating property: {property_id}")
+        try:
+            updated = await self.property_repository.update_property(
+                property_id, tenant_id, property_data
+            )
+            if not updated:
+                raise PropertyNotFoundException(f"Property {property_id} not found")
+            return updated
+        except PropertyNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error updating property: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def delete_property(self, property_id: uuid.UUID, tenant_id: uuid.UUID) -> bool:
+        logger.info(f"[PropertyService] Deleting property: {property_id}")
+        try:
+            success = await self.property_repository.delete_property(
+                property_id, tenant_id
+            )
+            if not success:
+                raise PropertyNotFoundException(f"Property {property_id} not found")
+            return True
+        except PropertyNotFoundException:
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error deleting property: {str(e)}")
+            raise ServiceException(str(e))

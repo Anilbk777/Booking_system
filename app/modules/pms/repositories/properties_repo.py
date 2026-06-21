@@ -1,6 +1,6 @@
 from app.modules.pms.models.properties_model import Property, PropertyAmenity
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update, delete
 
 from app.utils.exceptions import RepositoryException
 from app.utils.logging import LoggerFactory
@@ -22,10 +22,10 @@ class PropertyRepository:
             await self.db.refresh(new_property)
             logger.info("[PropertyRepository] Property created successfully")
             return new_property
-        except Exception as e:
+        except Exception:
             await self.db.rollback()
-            logger.error(f"[PropertyRepository] Error creating property: {str(e)}")
-            raise RepositoryException(str(e))
+            logger.error("[PropertyRepository] Error creating property")
+            raise
 
     async def get_property_by_id(
         self, property_id: uuid.UUID, tenant_id: uuid.UUID
@@ -39,10 +39,6 @@ class PropertyRepository:
                 )
             )
             property = result.scalar_one_or_none()
-            if property:
-                logger.info("[PropertyRepository] Property found")
-            else:
-                logger.error("[PropertyRepository] Property not found")
             return property
         except Exception as e:
             logger.error(f"[PropertyRepository] Error getting property by id: {str(e)}")
@@ -60,10 +56,6 @@ class PropertyRepository:
                 )
             )
             property = result.scalar_one_or_none()
-            if property:
-                logger.info("[PropertyRepository] Property found")
-            else:
-                logger.error("[PropertyRepository] Property not found")
             return property
         except Exception as e:
             logger.error(f"[PropertyRepository] Error getting property by name: {str(e)}")
@@ -92,11 +84,54 @@ class PropertyRepository:
                 select(PropertyAmenity).where(PropertyAmenity.property_id == property_id)
             )
             amenity = result.scalar_one_or_none()
-            if amenity:
-                logger.info("[PropertyRepository] Amenity found")
-            else:
-                logger.error("[PropertyRepository] Amenity not found")
             return amenity
         except Exception as e:
             logger.error(f"[PropertyRepository] Error getting amenity by id: {str(e)}")
+            raise RepositoryException(str(e))
+
+    async def list_properties(self, tenant_id: uuid.UUID) -> list[Property]:
+        logger.info(f"[PropertyRepository] Listing properties for tenant: {tenant_id}")
+        try:
+            result = await self.db.execute(
+                select(Property).where(Property.tenant_id == tenant_id)
+            )
+            return result.scalars().all()
+        except Exception as e:
+            logger.error(f"[PropertyRepository] Error listing properties: {str(e)}")
+            raise RepositoryException(str(e))
+
+    async def update_property(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID, property_data: dict
+    ) -> Property | None:
+        logger.info(f"[PropertyRepository] Updating property: {property_id}")
+        try:
+            query = (
+                update(Property)
+                .where(Property.id == property_id, Property.tenant_id == tenant_id)
+                .values(**property_data)
+                .returning(Property)
+            )
+            result = await self.db.execute(query)
+            updated_property = result.scalar_one_or_none()
+            await self.db.commit()
+            return updated_property
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[PropertyRepository] Error updating property: {str(e)}")
+            raise RepositoryException(str(e))
+
+    async def delete_property(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID
+    ) -> bool:
+        logger.info(f"[PropertyRepository] Deleting property: {property_id}")
+        try:
+            query = delete(Property).where(
+                Property.id == property_id, Property.tenant_id == tenant_id
+            )
+            result = await self.db.execute(query)
+            await self.db.commit()
+            return result.rowcount > 0
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[PropertyRepository] Error deleting property: {str(e)}")
             raise RepositoryException(str(e))

@@ -42,3 +42,14 @@ class TenantResponseSchema(TenantBase):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     owner_id: uuid.UUID
+
+
+class TenantUpdateSchema(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=255, strip_whitespace=True)
+    slug: Optional[str] = Field(None, min_length=2, max_length=100, strip_whitespace=True)
+    plan: Optional[Plan] = None
+    status: Optional[Status] = None
+    custom_domain: Optional[str] = None
+    logo_url: Optional[str] = None
+    currency: Optional[str] = Field(None, min_length=3, max_length=3)
+    timezone: Optional[str] = Field(None, min_length=3, max_length=100)

@@ -1,3 +1,5 @@
+from fastapi import BackgroundTasks
+
 from app.modules.auth.repositories.guests_repo import GuestRepository
 from app.modules.auth.models.guests_model import Guest
 from app.modules.auth.services.auth_services import AuthService
@@ -5,124 +7,222 @@ from app.utils.exceptions import (
     ServiceException,
     UserAlreadyExistsException,
     UserNotFoundException,
+    RepositoryException,
+    AccountInactiveException,
+    InvalidOTPException,
+    AccountActiveException,
+    UnauthorizedException,
 )
 from app.utils.logging import LoggerFactory
+from app.modules.auth.services.otp_service import OTPService
+from app.modules.auth.services.mail_services import send_verification_email
 
 logger = LoggerFactory.get_logger(__name__)
 
 
 class GuestService:
-    def __init__(self, guest_repository: GuestRepository, auth_service: AuthService):
+    def __init__(
+        self,
+        guest_repository: GuestRepository,
+        auth_service: AuthService,
+        otp_service: OTPService,
+        background_tasks: BackgroundTasks,
+    ):
         self.guest_repository = guest_repository
         self.auth_service = auth_service
+        self.otp_service = otp_service
+        self.background_tasks = background_tasks
 
-    async def register_guest(self, guest: dict) -> Guest:
-        logger.info("[GuestService] Creating guest")
-        existing_email = await self.guest_repository.get_guest_by_email(guest["email"])
-        if existing_email:
-            raise UserAlreadyExistsException(
-                f"Guest with email {guest['email']} already exists"
-            )
-        guest["password_hash"] = self.auth_service.get_password_hash(guest["password"])
-        guest.pop("password")
+    async def register_guest(self, guest_data: dict) -> Guest:
+        """
+        Public method to register a guest. It initiates the verification process.
+        """
+        logger.info(
+            f"[GuestService] Registration initiated for: {guest_data.get('email')}"
+        )
         try:
-            new_guest = await self.guest_repository.register_guest(guest)
-            logger.info("[GuestService] Guest created successfully")
-            return new_guest
-        except UserAlreadyExistsException:
+            existing_guest = await self.guest_repository.get_guest_by_email(
+                guest_data["email"]
+            )
+
+            if existing_guest:
+                if existing_guest.is_active:
+                    raise UserAlreadyExistsException(
+                        f"Guest with email {guest_data['email']} already exists and is active"
+                    )
+                return await self._handle_inactive_guest(existing_guest, guest_data)
+
+            return await self._create_new_guest(guest_data)
+
+        except (UserAlreadyExistsException, RepositoryException):
             raise
         except Exception as e:
-            logger.error(f"[GuestService] Error creating guest: {str(e)}")
+            logger.error(f"[GuestService] Unexpected error in register_guest: {str(e)}")
             raise ServiceException(str(e))
 
-    async def get_guest_by_email(self, email: str) -> Guest:
-        logger.info("[GuestService] Getting guest by email")
+    async def _handle_inactive_guest(self, guest: Guest, new_data: dict) -> Guest:
+        """Helper to reactivate/update an existing but unverified guest."""
+        logger.info(f"[GuestService] Updating inactive guest: {guest.email}")
+        guest.first_name = new_data["first_name"]
+        guest.last_name = new_data["last_name"]
+        guest.phone = new_data.get("phone")
+        guest.nationality = new_data.get("nationality")
+        guest.password_hash = self.auth_service.get_password_hash(new_data["password"])
+
+        updated_guest = await self.guest_repository.update_guest(guest)
+        await self._send_verification_otp(updated_guest.email)
+        return updated_guest
+
+    async def _create_new_guest(self, guest_data: dict) -> Guest:
+        """Helper to create a fresh inactive guest record."""
+        logger.info(f"[GuestService] Creating new guest record: {guest_data['email']}")
+        guest_data["password_hash"] = self.auth_service.get_password_hash(
+            guest_data.pop("password")
+        )
+
+        new_guest = await self.guest_repository.register_guest(guest_data)
+        await self._send_verification_otp(new_guest.email)
+        return new_guest
+
+    async def _send_verification_otp(self, email: str) -> None:
+        """Generates and sends an OTP via background tasks."""
+        otp = self.otp_service.generate_otp()
+        await self.otp_service.set_otp(email, otp)
+        self.background_tasks.add_task(send_verification_email, email, otp)
+        logger.info(f"[GuestService] Verification OTP triggered for {email}")
+
+    async def verify_registration_otp(self, email: str, otp: str) -> dict:
+        """Verifies the OTP and activates the guest."""
+        logger.info(f"[GuestService] Verifying OTP for guest: {email}")
         try:
             guest = await self.guest_repository.get_guest_by_email(email)
             if not guest:
                 raise UserNotFoundException(
-                    "Guest not found", f"Guest with email {email} not found"
+                    "Guest not found", f"Guest {email} not found"
                 )
-            logger.info("[GuestService] Guest found successfully")
+
+            if not await self.otp_service.verify_otp(email, otp):
+                raise InvalidOTPException(
+                    "Invalid or expired OTP", f"Invalid or expired OTP for {email}"
+                )
+
+            await self.otp_service.delete_otp(email)
+            guest.is_active = True
+            await self.guest_repository.update_guest(guest)
+
+            # Generate tokens upon successful verification
+            token_data = {"sub": str(guest.id), "role": "guest"}
+            return {
+                "access_token": self.auth_service.create_access_token(token_data),
+                "refresh_token": self.auth_service.create_refresh_token(token_data),
+                "token_type": "bearer",
+            }
+        except (UserNotFoundException, InvalidOTPException):
+            raise
+        except Exception as e:
+            logger.error(f"[GuestService] Error in verify_registration_otp: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def resend_registration_otp(self, email: str) -> bool:
+        """Resends the registration OTP if the guest is not yet active."""
+        logger.info(f"[GuestService] Resending OTP for: {email}")
+        try:
+            guest = await self.guest_repository.get_guest_by_email(email)
+            if not guest:
+                raise UserNotFoundException(
+                    "Guest not found", f"Guest {email} not found"
+                )
+
+            if guest.is_active:
+                raise AccountActiveException(
+                    "Guest is already active", f"Guest {email} is already active"
+                )
+
+            await self._send_verification_otp(email)
+            return True
+        except (
+            UserNotFoundException,
+            UserAlreadyExistsException,
+            AccountActiveException,
+        ):
+            raise
+        except Exception as e:
+            logger.error(f"[GuestService] Error in resend_registration_otp: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def login_guest(self, credentials: dict) -> dict:
+        logger.info(f"[GuestService] Login attempt: {credentials['email']}")
+        try:
+            guest = await self.guest_repository.get_guest_by_email(credentials["email"])
+            if not guest or not self.auth_service.verify_password(
+                credentials["password"], guest.password_hash
+            ):
+                raise UserNotFoundException(
+                    "Invalid credentials", "Email/Password mismatch"
+                )
+
+            if not guest.is_active:
+                raise AccountInactiveException(
+                    "Account not verified. Please verify your email."
+                )
+
+            token_data = {"sub": str(guest.id), "role": "guest"}
+            return {
+                "access_token": self.auth_service.create_access_token(token_data),
+                "refresh_token": self.auth_service.create_refresh_token(token_data),
+                "token_type": "bearer",
+            }
+        except (UserNotFoundException, ServiceException, AccountInactiveException):
+            raise
+        except Exception as e:
+            logger.error(f"[GuestService] Error in login_guest: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def get_guest_by_email(self, email: str) -> Guest:
+        logger.info(f"[GuestService] Fetching guest: {email}")
+        try:
+            guest = await self.guest_repository.get_guest_by_email(email)
+            if not guest:
+                raise UserNotFoundException(
+                    "Guest not found", f"Guest {email} not found"
+                )
             return guest
         except UserNotFoundException:
             raise
         except Exception as e:
-            logger.error(f"[GuestService] Error getting guest by email: {str(e)}")
+            logger.error(f"[GuestService] Error in get_guest_by_email: {str(e)}")
             raise ServiceException(str(e))
 
     async def get_guest_by_id(self, guest_id: str) -> Guest:
-        logger.info("[GuestService] Getting guest by ID")
+        logger.info(f"[GuestService] Fetching guest by ID: {guest_id}")
         try:
             guest = await self.guest_repository.get_guest_by_id(guest_id)
             if not guest:
                 raise UserNotFoundException(
-                    "Guest not found", f"Guest with ID {guest_id} not found"
+                    "Guest not found", f"ID {guest_id} not found"
                 )
-            logger.info("[GuestService] Guest found successfully")
             return guest
         except UserNotFoundException:
             raise
         except Exception as e:
-            logger.error(f"[GuestService] Error getting guest by ID: {str(e)}")
-            raise ServiceException(str(e))
-
-    async def login_guest(self, guest: dict) -> dict:
-        logger.info("[GuestService] Logging in guest")
-        try:
-            existing_guest = await self.guest_repository.get_guest_by_email(
-                guest["email"]
-            )
-            if not existing_guest:
-                raise UserNotFoundException(
-                    "Invalid credentials",
-                    f"Guest with email {guest['email']} not found",
-                )
-            if not self.auth_service.verify_password(
-                guest["password"], existing_guest.password_hash
-            ):
-                raise UserNotFoundException(
-                    "Invalid credentials",
-                    f"Invalid password for guest {guest['email']}",
-                )
-            token = self.auth_service.create_access_token(
-                {"sub": str(existing_guest.id), "role": "guest"}
-            )
-            refresh_token = self.auth_service.create_refresh_token(
-                {"sub": str(existing_guest.id), "role": "guest"}
-            )
-            logger.info("[GuestService] Guest logged in successfully")
-            return {
-                "access_token": token,
-                "refresh_token": refresh_token,
-                "token_type": "bearer",
-            }
-        except UserNotFoundException:
-            raise
-        except Exception as e:
-            logger.error(f"[GuestService] Error logging in guest: {str(e)}")
+            logger.error(f"[GuestService] Error in get_guest_by_id: {str(e)}")
             raise ServiceException(str(e))
 
     async def refresh_token(self, refresh_token: str) -> dict:
-        logger.info("[GuestService] Refreshing token")
+        logger.info("[GuestService] Refreshing tokens")
         try:
-            user_id = self.auth_service.verify_refresh_token(refresh_token)
-            if not user_id:
-                raise UserNotFoundException(
-                    "Invalid credentials", "Invalid refresh token"
-                )
-            token = self.auth_service.create_access_token({"sub": str(user_id), "role": "guest"})
-            refresh_token = self.auth_service.create_refresh_token(
-                {"sub": str(user_id), "role": "guest"}
-            )
-            logger.info("[GuestService] Token refreshed successfully")
+            payload = self.auth_service.verify_refresh_token(refresh_token)
+            if not payload:
+                raise UnauthorizedException("Invalid refresh token")
+
+            token_data = {"sub": str(payload["user_id"]), "role": "guest"}
             return {
-                "access_token": token,
-                "refresh_token": refresh_token,
+                "access_token": self.auth_service.create_access_token(token_data),
+                "refresh_token": self.auth_service.create_refresh_token(token_data),
                 "token_type": "bearer",
             }
-        except UserNotFoundException:
+        except UnauthorizedException:
             raise
         except Exception as e:
-            logger.error(f"[GuestService] Error refreshing token: {str(e)}")
-            raise ServiceException(str(e))
+            logger.error(f"[GuestService] Error in refresh_token: {str(e)}")
+            raise ServiceException("Token refresh failed")

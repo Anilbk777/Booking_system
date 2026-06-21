@@ -10,6 +10,7 @@ from sqlalchemy import (
     ARRAY,
     Enum as SqlEnum,
     DateTime,
+    Boolean,
 )
 from app.config.database_config import Base
 from typing import Optional, List
@@ -66,6 +67,8 @@ class Property(Base):
     check_out_time: Mapped[time] = mapped_column(
         Time, default=time(12, 0), nullable=False
     )
+    description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
