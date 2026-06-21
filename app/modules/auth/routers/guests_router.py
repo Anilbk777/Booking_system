@@ -54,7 +54,7 @@ async def refresh_token(
     refresh_token: RefreshTokenRequest,
     guest_service: Annotated[GuestService, Depends(get_guest_service)],
 ):
-    return await guest_service.refresh_token(refresh_token)
+    return await guest_service.refresh_token(refresh_token.refresh_token)
 
 
 @router.get("/me", response_model=GuestResponse, status_code=status.HTTP_200_OK)

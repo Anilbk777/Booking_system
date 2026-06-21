@@ -59,7 +59,7 @@ async def refresh_token(
     refresh_token: RefreshTokenRequest,
     user_service: UserService = Depends(get_user_service),
 ):
-    return await user_service.refresh_token(refresh_token)
+    return await user_service.refresh_token(refresh_token.refresh_token)
 
 
 @router.get("/me", response_model=UserResponse)

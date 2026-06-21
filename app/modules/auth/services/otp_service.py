@@ -27,7 +27,7 @@ class OTPService:
         """
         key = self._generate_key(email)
         try:
-            await self.redis.setex(name=key, time=self.ttl, value=otp_code)
+            await self.redis.set(name=key, value=otp_code, ex=self.ttl)
         except Exception as e:
             logger.error(f"[OTPService] Error setting OTP: {str(e)}")
             raise ServiceException(str(e))

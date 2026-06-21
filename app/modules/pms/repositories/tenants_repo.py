@@ -2,7 +2,7 @@ from app.modules.pms.models.tenants_model import Tenant
 from app.modules.auth.models.users_model import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func, update, delete
-
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from app.utils.exceptions import RepositoryException
 from app.utils.logging import LoggerFactory
 import uuid
@@ -23,6 +23,14 @@ class TenantRepository:
             await self.db.refresh(new_tenant)
             logger.info("[TenantsRepoitory] Tenant created successfully")
             return new_tenant
+        except IntegrityError as e:
+            await self.db.rollback()
+            logger.error(f"[TenantsRepoitory] Error creating tenant: {str(e)}")
+            raise RepositoryException(str(e))
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"[TenantsRepoitory] Error creating tenant: {str(e)}")
+            raise RepositoryException(str(e))
         except Exception as e:
             await self.db.rollback()
             logger.error(f"[TenantsRepoitory] Error creating tenant: {str(e)}")
@@ -38,6 +46,11 @@ class TenantRepository:
             else:
                 logger.error("[TenantsRepoitory] Tenant not found")
             return tenant
+
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"[TenantsRepoitory] Error getting tenant by id: {str(e)}")
+            raise RepositoryException(str(e))
         except Exception as e:
             logger.error(f"[TenantsRepoitory] Error getting tenant by id: {str(e)}")
             raise RepositoryException(str(e))
@@ -54,15 +67,18 @@ class TenantRepository:
             else:
                 logger.error("[TenantsRepoitory] Tenant not found")
             return tenant
+        except SQLAlchemyError as e:
+            logger.error(f"[TenantsRepoitory] Error getting tenant by id: {str(e)}")
+            raise RepositoryException(str(e))
         except Exception as e:
             logger.error(f"[TenantsRepoitory] Error getting tenant by id: {str(e)}")
             raise RepositoryException(str(e))
 
     async def check_existing_tenant(
-        self, tenant_name: str, slug: str, owner_id: uuid.UUID
+        self, tenant_name: str, owner_id: uuid.UUID
     ) -> Tenant | None:
         logger.info(
-            f"[TenantsRepository] Checking existence for tenant name: '{tenant_name}' or slug: '{slug}'"
+            f"[TenantsRepository] Checking existence for tenant name: '{tenant_name}'"
         )
 
         try:
@@ -70,7 +86,6 @@ class TenantRepository:
                 Tenant.owner_id == owner_id,
                 or_(
                     func.lower(Tenant.name) == tenant_name.lower(),
-                    func.lower(Tenant.slug) == slug.lower(),
                 ),
             )
 
@@ -79,7 +94,7 @@ class TenantRepository:
 
             if tenant:
                 logger.info(
-                    "[TenantsRepository] Conflict found: Tenant with this name or slug already exists."
+                    "[TenantsRepository] Conflict found: Tenant with this name already exists."
                 )
             else:
                 logger.debug(
@@ -88,6 +103,11 @@ class TenantRepository:
 
             return tenant
 
+        except SQLAlchemyError as e:
+            logger.error(
+                f"[TenantsRepository] Database failure during tenant lookup: {str(e)}"
+            )
+            raise RepositoryException(str(e))
         except Exception as e:
             logger.error(
                 f"[TenantsRepository] Database failure during tenant lookup: {str(e)}"
@@ -111,6 +131,11 @@ class TenantRepository:
             else:
                 logger.error("[TenantsRepoitory] User not found")
                 return False
+
+        except SQLAlchemyError as e:
+            logger.error(f"[TenantsRepoitory] Error updating user: {str(e)}")
+            await self.db.rollback()
+            raise RepositoryException(str(e))
         except Exception as e:
             logger.error(f"[TenantsRepoitory] Error updating user: {str(e)}")
             await self.db.rollback()
@@ -119,10 +144,19 @@ class TenantRepository:
     async def update_tenant(self, tenant_id: uuid.UUID, data: dict) -> Tenant | None:
         logger.info(f"[TenantsRepoitory] Updating tenant: {tenant_id}")
         try:
-            query = update(Tenant).where(Tenant.id == tenant_id).values(**data).returning(Tenant)
+            query = (
+                update(Tenant)
+                .where(Tenant.id == tenant_id)
+                .values(**data)
+                .returning(Tenant)
+            )
             result = await self.db.execute(query)
             await self.db.commit()
             return result.scalar_one_or_none()
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"[TenantsRepoitory] Error updating tenant: {str(e)}")
+            raise RepositoryException(str(e))
         except Exception as e:
             await self.db.rollback()
             logger.error(f"[TenantsRepoitory] Error updating tenant: {str(e)}")
@@ -135,6 +169,10 @@ class TenantRepository:
             result = await self.db.execute(query)
             await self.db.commit()
             return result.rowcount > 0
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"[TenantsRepoitory] Error deleting tenant: {str(e)}")
+            raise RepositoryException(str(e))
         except Exception as e:
             await self.db.rollback()
             logger.error(f"[TenantsRepoitory] Error deleting tenant: {str(e)}")
@@ -142,5 +180,15 @@ class TenantRepository:
 
     async def list_tenants(self) -> list[Tenant]:
         # For superadmin use
-        result = await self.db.execute(select(Tenant))
-        return result.scalars().all()
+        logger.info("[TenantsRepoitory] Listing tenants")
+        try:
+            result = await self.db.execute(select(Tenant))
+            tenants = result.scalars().all()
+            logger.info(f"[TenantsRepoitory] {len(tenants)} tenants found")
+            return tenants
+        except SQLAlchemyError as e:
+            logger.error(f"[TenantsRepoitory] Error listing tenants: {str(e)}")
+            raise RepositoryException(str(e))
+        except Exception as e:
+            logger.error(f"[TenantsRepoitory] Error listing tenants: {str(e)}")
+            raise RepositoryException(str(e))

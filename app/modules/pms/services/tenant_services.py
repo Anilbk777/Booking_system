@@ -21,12 +21,13 @@ class TenantService:
         tenant_data["owner_id"] = owner_id
         try:
             existing_tenant = await self.tenant_repo.check_existing_tenant(
-                tenant_data["name"], tenant_data["slug"], owner_id
+                tenant_name=tenant_data["name"],
+                owner_id=owner_id,
             )
             if existing_tenant:
                 logger.info("[TenantService] Tenant already exists")
                 raise TenantSlugAlreadyExistsException(
-                    f"Tenant with name {tenant_data['name']} or slug {tenant_data['slug']} already exists"
+                    f"Tenant with name {tenant_data['name']} already exists"
                 )
             new_tenant = await self.tenant_repo.create_tenant(tenant_data)
             logger.info("[TenantService] Tenant created successfully")
@@ -90,13 +91,15 @@ class TenantService:
             logger.error(f"[TenantService] Error updating tenant id: {str(e)}")
             raise ServiceException(str(e))
 
-    async def update_tenant(self, tenant_id: uuid.UUID, owner_id: uuid.UUID, data: dict) -> Tenant:
+    async def update_tenant(
+        self, tenant_id: uuid.UUID, owner_id: uuid.UUID, data: dict
+    ) -> Tenant:
         logger.info(f"[TenantService] Updating tenant: {tenant_id}")
         try:
             tenant = await self.tenant_repo.get_tenant_by_id(tenant_id)
             if not tenant or tenant.owner_id != owner_id:
                 raise TenantNotFoundException(f"Tenant {tenant_id} not found")
-            
+
             updated = await self.tenant_repo.update_tenant(tenant_id, data)
             return updated
         except TenantNotFoundException:
@@ -111,7 +114,7 @@ class TenantService:
             tenant = await self.tenant_repo.get_tenant_by_id(tenant_id)
             if not tenant or tenant.owner_id != owner_id:
                 raise TenantNotFoundException(f"Tenant {tenant_id} not found")
-            
+
             return await self.tenant_repo.delete_tenant(tenant_id)
         except TenantNotFoundException:
             raise

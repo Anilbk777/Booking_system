@@ -1,9 +1,9 @@
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import String, ForeignKey, UniqueConstraint, Enum as SqlEnum
+from sqlalchemy import String, ForeignKey, UniqueConstraint, Enum as SqlEnum, DateTime
 from app.config.database_config import Base
-
+from datetime import datetime, UTC
 from typing import Optional, List
 from enum import StrEnum
 
@@ -42,8 +42,13 @@ class Tenant(Base):
         String(255), unique=True, nullable=True
     )
     logo_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
-    currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=False)
+    currency: Mapped[Optional[str]] = mapped_column(
+        String(3), default="USD", nullable=False
+    )
     timezone: Mapped[str] = mapped_column(String(100), default="UTC", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
 
     __table_args__ = (
         UniqueConstraint("owner_id", "name", name="uq_tenant_owner_name"),
@@ -53,12 +58,15 @@ class Tenant(Base):
     owner: Mapped["User"] = relationship(
         "User", foreign_keys=[owner_id], back_populates="owned_tenants"
     )
-    
+
     # 2. All the users (Admins, Managers, Receptionists) who work in this workspace
     staff_members: Mapped[List["User"]] = relationship(
-        "User", foreign_keys="[User.tenant_id]", back_populates="workspace", cascade="all, delete-orphan"
+        "User",
+        foreign_keys="[User.tenant_id]",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
     )
-    
+
     properties: Mapped[List["Property"]] = relationship(
         "Property", back_populates="tenant", cascade="all, delete-orphan"
     )
