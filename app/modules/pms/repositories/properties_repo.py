@@ -5,7 +5,7 @@ from sqlalchemy import select, func, update, delete
 from app.utils.exceptions import RepositoryException
 from app.utils.logging import LoggerFactory
 
-from app.modules.pms.models.properties_model import Property
+from app.modules.pms.models.properties_model import Property, PropertyPhoto
 import uuid
 
 logger = LoggerFactory.get_logger(__name__)
@@ -112,3 +112,34 @@ class PropertyRepository:
             await self.db.rollback()
             logger.error(f"[PropertyRepository] Error deleting property: {str(e)}")
             raise RepositoryException(str(e))
+
+    async def add_images_to_property(
+        self, property_id: uuid.UUID, photos: list[PropertyPhoto]
+    ) -> list[PropertyPhoto]:
+        logger.info(
+            f"[PropertyRepository] Adding {len(photos)} images to property {property_id}"
+        )
+        if not photos:
+            return []
+
+        try:
+            self.db.add_all(photos)
+            await self.db.commit()
+
+            for photo in photos:
+                await self.db.refresh(photo)
+
+            return photos
+
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"[PropertyRepository] Database error adding images: {str(e)}")
+            raise RepositoryException("Failed to save property images to the database.")
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(
+                f"[PropertyRepository] Unexpected error adding images: {str(e)}"
+            )
+            raise RepositoryException(
+                "An unexpected error occurred while saving images."
+            )

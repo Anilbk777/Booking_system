@@ -84,6 +84,7 @@ class PropertyBase(BaseModel):
 class PropertyCreate(PropertyBase):
     pass
 
+
 class PropertyUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -105,10 +106,20 @@ class PropertyUpdate(BaseModel):
     total_rooms: Optional[int] = Field(None, ge=0)
     year_built: Optional[int] = Field(None, ge=1000, le=2100)
     amenities: Optional[List[str]] = Field(default=None)
-    
+
+
 class PropertyResponse(PropertyBase):
     id: uuid.UUID
     tenant_id: uuid.UUID
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PropertyPhotoResponse(BaseModel):
+    id: uuid.UUID
+    property_id: uuid.UUID
+    photo_url: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

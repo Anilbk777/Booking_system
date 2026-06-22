@@ -184,3 +184,14 @@ class ResourceConflictException(AppBaseException):
         super().__init__(
             user_message=user_message, internal_detail=internal_detail, status_code=400
         )
+
+
+class InvalidImageException(AppBaseException):
+    def __init__(
+        self, user_message="Invalid image file provided", internal_detail: str = None
+    ):
+        super().__init__(
+            user_message=user_message,
+            internal_detail=internal_detail,
+            status_code=400,
+        )

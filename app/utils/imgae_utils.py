@@ -1,35 +1,57 @@
+
 import uuid
 from io import BytesIO
 from pathlib import Path
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
+from .exceptions import InvalidImageException
+
+# Crucial: Prevent large image decompression attacks
+Image.MAX_IMAGE_PIXELS = 25_000_000  # Max ~25 Megapixels (approx. 5000x5000)
+
 
 PROPERTY_PICS_DIR = Path("static/uploads/properties")
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB strict limit
+
 
 def process_property_image(content: bytes) -> str:
     """
     Synchronous, CPU-bound image processing function.
     Resizes property photos for optimal Web/Mobile viewing without cropping.
     """
-    with Image.open(BytesIO(content)) as original:
-        # Auto-orient based on camera EXIF data (fixes sideways phone photos)
-        img = ImageOps.exif_transpose(original)
+    # 1. Guard against memory exhaustion attacks
+    if len(content) > MAX_FILE_SIZE:
+        raise InvalidImageException(
+            "File size exceeds the maximum limit of 10MB.",
+            f"File size is {len(content)} bytes",
+        )
 
-        # Ensure image is in RGB mode (drops transparency/alpha channels)
-        if img.mode in ("RGBA", "LA", "P"):
-            img = img.convert("RGB")
+    try:
+        # 2. Open image inside context manager safely
+        with Image.open(BytesIO(content)) as original:
+            # Auto-orient based on camera EXIF data
+            img = ImageOps.exif_transpose(original)
 
-        # 1280x1280 is a bounding box. 
-        # A 4000x2000 image becomes 1280x640 (aspect ratio is preserved!)
-        img.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
+            # Ensure image is in RGB mode
+            if img.mode in ("RGBA", "LA", "P"):
+                img = img.convert("RGB")
 
-        # Generate unique filename using WebP
-        filename = f"{uuid.uuid4().hex}.webp"
-        filepath = PROPERTY_PICS_DIR / filename
+            # Preserve aspect ratio within bounding box
+            img.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
 
-        # Ensure directory exists
-        PROPERTY_PICS_DIR.mkdir(parents=True, exist_ok=True)
+            # Generate unique paths safely
+            filename = f"{uuid.uuid4().hex}.webp"
+            filepath = PROPERTY_PICS_DIR / filename
 
-        # Save as optimized WebP
-        img.save(filepath, "WEBP", quality=80)
+            # Ensure target directories are safely created
+            PROPERTY_PICS_DIR.mkdir(parents=True, exist_ok=True)
 
-    return filename
+            # 3. Save as optimized WebP with compression flags enabled
+            img.save(filepath, "WEBP", quality=80, optimize=True, lossless=False)
+
+        return filename
+
+    except (UnidentifiedImageError, ValueError, Image.DecompressionBombError) as e:
+        raise InvalidImageException(
+            "Uploaded file is corrupted or not a valid image format.",
+            f"Uploaded file is corrupted or not a valid image format: {e}",
+        )

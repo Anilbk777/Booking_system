@@ -1,13 +1,17 @@
+from fastapi import UploadFile
 from app.modules.pms.repositories.properties_repo import PropertyRepository
-from app.modules.pms.models.properties_model import Property
+from app.modules.pms.models.properties_model import Property, PropertyPhoto
 from app.utils.exceptions import (
     RepositoryException,
     ServiceException,
     PropertyAlreadyExistsException,
     PropertyNotFoundException,
     UnauthorizedException,
+    InvalidImageException,
 )
 from app.utils.logging import LoggerFactory
+from starlette.concurrency import run_in_threadpool
+from app.utils.imgae_utils import process_property_image
 import uuid
 
 logger = LoggerFactory.get_logger(__name__)
@@ -121,7 +125,9 @@ class PropertyService:
                 logger.error(
                     f"[PropertyService] Failed to delete property with id {property_id}"
                 )
-                raise RepositoryException(f"Failed to delete property with id {property_id}")
+                raise RepositoryException(
+                    f"Failed to delete property with id {property_id}"
+                )
             return True
         except (PropertyNotFoundException, RepositoryException):
             raise
@@ -129,7 +135,9 @@ class PropertyService:
             logger.error(f"[PropertyService] Error deleting property: {str(e)}")
             raise ServiceException(str(e))
 
-    async def upload_images(self, property_id: uuid.UUID, files: list[UploadFile], tenant_id: uuid.UUID) -> Property:
+    async def upload_images(
+        self, property_id: uuid.UUID, files: list[UploadFile], tenant_id: uuid.UUID
+    ) -> list[PropertyPhoto]:
         logger.info(f"[PropertyService] Uploading images for property: {property_id}")
         try:
             existing_property = await self.get_property_by_id(property_id, tenant_id)
@@ -138,16 +146,29 @@ class PropertyService:
                     f"[PropertyService] Property with id {property_id} not found"
                 )
                 raise PropertyNotFoundException(f"Property {property_id} not found")
-            
-            uploaded_files = await self.property_repository.upload_images(property_id, files, tenant_id)
-            if not uploaded_files:
-                logger.error(
-                    f"[PropertyService] Failed to upload images for property with id {property_id}"
+
+            photo_objects = []
+
+            for file in files:
+                # 1. Read bytes safely
+                file_bytes = await file.read()
+                # 2. Process image (this handles all validation & resizing)
+                filename = await run_in_threadpool(process_property_image, file_bytes)
+
+                # Create the relative URL for the frontend to consume
+                relative_url = f"/static/uploads/properties/{filename}"
+                new_photo = PropertyPhoto(
+                    property_id=property_id, photo_url=relative_url
                 )
-                raise RepositoryException(f"Failed to upload images for property with id {property_id}")
-            return uploaded_files
-        except (PropertyNotFoundException, RepositoryException):
+                photo_objects.append(new_photo)
+
+            return await self.property_repository.add_images_to_property(
+                property_id, photo_objects
+            )
+        except (PropertyNotFoundException, InvalidImageException):
             raise
-        except Exception as e:
-            logger.error(f"[PropertyService] Error uploading images: {str(e)}")
-            raise ServiceException(str(e))
+        except Exception as exc:
+            logger.error(
+                f"[PropertyService] Error uploading images for {property_id}: {exc}"
+            )
+            raise ServiceException("Failed to upload images.")

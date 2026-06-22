@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, status, UploadFile
+from fastapi import APIRouter, Depends, status, UploadFile, File, HTTPException
 from app.modules.pms.schemas.properties_schemas import (
     PropertyCreate,
     PropertyResponse,
-    PropertyUpdate
+    PropertyUpdate,
+    PropertyPhotoResponse,
 )
 from app.modules.pms.services.properties_scervices import PropertyService
 from app.modules.pms.dependencies import get_property_service
@@ -12,9 +13,7 @@ import uuid
 router = APIRouter(prefix="/pms/properties", tags=["Property Management System"])
 
 
-@router.post(
-    "/", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED)
 async def create_property(
     property_data: PropertyCreate,
     current_user: CurrentUser,
@@ -39,6 +38,7 @@ async def get_property(
         property_id, current_user.tenant_id
     )
 
+
 @router.patch(
     "/{property_id}",
     response_model=PropertyResponse,
@@ -54,6 +54,7 @@ async def update_property(
         property_id, property_data.model_dump(), current_user.tenant_id
     )
 
+
 @router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_property(
     property_id: uuid.UUID,
@@ -64,11 +65,19 @@ async def delete_property(
     return None
 
 
-@router.post("/{property_id}/images")
+@router.post("/{property_id}/images", response_model=PropertyPhotoResponse)
 async def upload_images(
     property_id: uuid.UUID,
-    files: list[UploadFile], 
     current_user: CurrentUser,
+    files: list[UploadFile] = File(..., description="Select max 5 property images"),
     property_service: PropertyService = Depends(get_property_service),
 ):
-    return await property_service.upload_images(property_id, files, current_user.tenant_id)
+    if len(files) > 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can only upload a maximum of 5 photos at a time.",
+        )
+
+    return await property_service.upload_images(
+        property_id, files, current_user.tenant_id
+    )
