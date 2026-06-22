@@ -1,34 +1,32 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, UploadFile
 from app.modules.pms.schemas.properties_schemas import (
     PropertyCreate,
-    PropertyUpdate,
     PropertyResponse,
-    PropertyAmenityCreate,
-    PropertyAmenityResponse,
+    PropertyUpdate
 )
 from app.modules.pms.services.properties_scervices import PropertyService
 from app.modules.pms.dependencies import get_property_service
 from app.modules.auth.auth_middlewares import CurrentUser
 import uuid
 
-router = APIRouter(prefix="/pms", tags=["Property Management System"])
+router = APIRouter(prefix="/pms/properties", tags=["Property Management System"])
 
 
 @router.post(
-    "/properties", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED
+    "/", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED
 )
 async def create_property(
-    property: PropertyCreate,
+    property_data: PropertyCreate,
     current_user: CurrentUser,
     property_service: PropertyService = Depends(get_property_service),
 ):
     return await property_service.create_property(
-        property.model_dump(), current_user.tenant_id
+        property_data.model_dump(), current_user.tenant_id
     )
 
 
 @router.get(
-    "/properties/{property_id}",
+    "/{property_id}",
     response_model=PropertyResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -41,19 +39,8 @@ async def get_property(
         property_id, current_user.tenant_id
     )
 
-
-@router.get(
-    "/properties", response_model=list[PropertyResponse], status_code=status.HTTP_200_OK
-)
-async def list_properties(
-    current_user: CurrentUser,
-    property_service: PropertyService = Depends(get_property_service),
-):
-    return await property_service.list_properties(current_user.tenant_id)
-
-
-@router.put(
-    "/properties/{property_id}",
+@router.patch(
+    "/{property_id}",
     response_model=PropertyResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -64,11 +51,10 @@ async def update_property(
     property_service: PropertyService = Depends(get_property_service),
 ):
     return await property_service.update_property(
-        property_id, current_user.tenant_id, property_data.model_dump(exclude_unset=True)
+        property_id, property_data.model_dump(), current_user.tenant_id
     )
 
-
-@router.delete("/properties/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_property(
     property_id: uuid.UUID,
     current_user: CurrentUser,
@@ -78,30 +64,11 @@ async def delete_property(
     return None
 
 
-@router.post(
-    "/properties/{property_id}/amenities",
-    response_model=PropertyAmenityResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_amenity(
-    amenity: PropertyAmenityCreate,
+@router.post("/{property_id}/images")
+async def upload_images(
     property_id: uuid.UUID,
+    files: list[UploadFile], 
     current_user: CurrentUser,
     property_service: PropertyService = Depends(get_property_service),
 ):
-    return await property_service.create_amenity(
-        amenity.model_dump(), current_user.tenant_id, property_id
-    )
-
-
-@router.get(
-    "/properties/{property_id}/amenities",
-    response_model=PropertyAmenityResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def get_amenity(
-    property_id: uuid.UUID,
-    current_user: CurrentUser,
-    property_service: PropertyService = Depends(get_property_service),
-):
-    return await property_service.get_amenity_by_id(property_id)
+    return await property_service.upload_images(property_id, files, current_user.tenant_id)

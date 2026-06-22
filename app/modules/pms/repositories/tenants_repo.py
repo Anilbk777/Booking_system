@@ -152,7 +152,7 @@ class TenantRepository:
             )
             result = await self.db.execute(query)
             await self.db.commit()
-            return result.scalar_one_or_none()
+            return result.scalars().first()
         except SQLAlchemyError as e:
             await self.db.rollback()
             logger.error(f"[TenantsRepoitory] Error updating tenant: {str(e)}")

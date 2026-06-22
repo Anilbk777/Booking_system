@@ -1,8 +1,9 @@
 from app.modules.pms.repositories.tenants_repo import TenantRepository
 from app.utils.exceptions import (
+    RepositoryException,
     ServiceException,
     TenantNotFoundException,
-    TenantSlugAlreadyExistsException,
+    TenantAlreadyExistsException,
 )
 from app.utils.logging import LoggerFactory
 import uuid
@@ -19,21 +20,21 @@ class TenantService:
         logger.info(f"[TenantService] Creating tenant: {tenant}")
         tenant_data = tenant
         tenant_data["owner_id"] = owner_id
+
         try:
-            existing_tenant = await self.tenant_repo.check_existing_tenant(
-                tenant_name=tenant_data["name"],
+            tenant_exists = await self.tenant_repo.get_tenant_by_owner_id(
                 owner_id=owner_id,
             )
-            if existing_tenant:
-                logger.info("[TenantService] Tenant already exists")
-                raise TenantSlugAlreadyExistsException(
+            if tenant_exists:
+                logger.error("[TenantService] Tenant already exists")
+                raise TenantAlreadyExistsException(
                     f"Tenant with name {tenant_data['name']} already exists"
                 )
             new_tenant = await self.tenant_repo.create_tenant(tenant_data)
             logger.info("[TenantService] Tenant created successfully")
             return new_tenant
 
-        except TenantSlugAlreadyExistsException:
+        except (TenantAlreadyExistsException, RepositoryException):
             raise
         except Exception as e:
             logger.error(f"[TenantService] Error creating tenant: {str(e)}")
@@ -50,7 +51,7 @@ class TenantService:
                 )
             logger.info("[TenantService] Tenant found")
             return tenant
-        except TenantNotFoundException:
+        except (TenantNotFoundException, RepositoryException):
             raise
         except Exception as e:
             logger.error(f"[TenantService] Error getting tenant by owner id: {str(e)}")
@@ -70,7 +71,7 @@ class TenantService:
                 raise TenantNotFoundException(f"Tenant with id {tenant_id} not found")
             logger.info("[TenantService] Tenant found")
             return tenant
-        except TenantNotFoundException:
+        except (TenantNotFoundException, RepositoryException):
             raise
         except Exception as e:
             logger.error(f"[TenantService] Error getting tenant by id: {str(e)}")
@@ -87,6 +88,8 @@ class TenantService:
                 raise ServiceException("Error updating tenant id")
             logger.info("[TenantService] Tenant id updated successfully")
             return True
+        except (ServiceException, RepositoryException):
+            raise
         except Exception as e:
             logger.error(f"[TenantService] Error updating tenant id: {str(e)}")
             raise ServiceException(str(e))
@@ -102,7 +105,7 @@ class TenantService:
 
             updated = await self.tenant_repo.update_tenant(tenant_id, data)
             return updated
-        except TenantNotFoundException:
+        except (TenantNotFoundException, RepositoryException):
             raise
         except Exception as e:
             logger.error(f"[TenantService] Error updating tenant: {str(e)}")
@@ -116,7 +119,7 @@ class TenantService:
                 raise TenantNotFoundException(f"Tenant {tenant_id} not found")
 
             return await self.tenant_repo.delete_tenant(tenant_id)
-        except TenantNotFoundException:
+        except (TenantNotFoundException, RepositoryException):
             raise
         except Exception as e:
             logger.error(f"[TenantService] Error deleting tenant: {str(e)}")

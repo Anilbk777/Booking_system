@@ -1,11 +1,7 @@
 from .tenants_model import Tenant
-from .properties_model import Property, PropertyAmenity
-from .rooms_model import RoomType, PropertyRoomUnit
+from .properties_model import Property
 
 __all__ = [
     "Tenant",
     "Property",
-    "PropertyAmenity",
-    "RoomType",
-    "PropertyRoomUnit",
 ]

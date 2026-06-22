@@ -2,11 +2,14 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator, validator
 from typing import Optional
 import uuid
 from zoneinfo import ZoneInfo
+from datetime import datetime
 
 
 class TenantBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=255, strip_whitespace=True)
-    slug: str = Field(min_length=2, max_length=100, strip_whitespace=True)
+    slug: Optional[str] = Field(
+        default=None, min_length=2, max_length=100, strip_whitespace=True
+    )
     custom_domain: Optional[str] = Field(default=None)
     logo_url: Optional[str] = Field(default=None)
     currency: str = Field(default="USD", min_length=3, max_length=3)
@@ -39,6 +42,7 @@ class TenantResponseSchema(TenantBase):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     owner_id: uuid.UUID
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class TenantUpdateSchema(BaseModel):

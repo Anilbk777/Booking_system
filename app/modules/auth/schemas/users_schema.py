@@ -62,4 +62,5 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    role: str
     created_at: datetime

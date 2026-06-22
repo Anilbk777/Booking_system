@@ -28,7 +28,7 @@ async def handle_app_exception(request: Request, exc: AppBaseException):
     )
 
 
-# ── 2. Request validation error (bad incoming JSON / query params) ──
+@app.exception_handler(RequestValidationError)
 async def handle_request_validation_error(
     request: Request, exc: RequestValidationError
 ):
@@ -40,6 +40,14 @@ async def handle_request_validation_error(
 
     first_error = exc.errors()[0]
 
+    # 1. Intercept malformed JSON syntax errors explicitly
+    if first_error.get("type") == "json_invalid":
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid JSON payload format."},
+        )
+
+    # 2. Your existing formatting for standard field validation errors
     field = " → ".join(str(loc) for loc in first_error["loc"][1:])
     message = first_error["msg"].replace("Value error, ", "")
 
@@ -92,7 +100,9 @@ async def handle_integrity_error(request: Request, exc: IntegrityError):
         request.url.path,
     )
     # Extract useful part of the error if possible (e.g. duplicate key)
-    error_msg = "A database conflict occurred (e.g. duplicate entry or invalid reference)."
+    error_msg = (
+        "A database conflict occurred (e.g. duplicate entry or invalid reference)."
+    )
     if "UNIQUE constraint failed" in str(exc):
         error_msg = "An entry with this name or unique identifier already exists."
     elif "FOREIGN KEY constraint failed" in str(exc):

@@ -74,6 +74,7 @@ class InvalidOTPException(AppBaseException):
             user_message=user_message, internal_detail=internal_detail, status_code=400
         )
 
+
 class InvalidRefreshTokenException(AppBaseException):
     """Raised when a refresh token is invalid or expired."""
 
@@ -97,7 +98,7 @@ class TenantAlreadyExistsException(AppBaseException):
 
     def __init__(self, internal_detail: str = None):
         super().__init__(
-            user_message="Tenant with this name already exists",
+            user_message="Tenant already exists",
             internal_detail=internal_detail,
             status_code=400,
         )
