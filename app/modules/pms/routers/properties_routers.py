@@ -65,7 +65,7 @@ async def delete_property(
     return None
 
 
-@router.post("/{property_id}/images", response_model=PropertyPhotoResponse)
+@router.post("/{property_id}/images", response_model=list[PropertyPhotoResponse])
 async def upload_images(
     property_id: uuid.UUID,
     current_user: CurrentUser,
@@ -78,6 +78,15 @@ async def upload_images(
             detail="You can only upload a maximum of 5 photos at a time.",
         )
 
-    return await property_service.upload_images(
+    images = await property_service.upload_images(
         property_id, files, current_user.tenant_id
     )
+    return [
+        PropertyPhotoResponse(
+            id=image.id,
+            property_id=image.property_id,
+            photo_url=image.photo_url,
+            created_at=image.created_at,
+        )
+        for image in images
+    ]

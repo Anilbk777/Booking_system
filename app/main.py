@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, StaticFiles
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from app.config.database_config import Base, engine
 from app.utils.exception_handlers import register_exception_handlers
 from fastapi.middleware.cors import CORSMiddleware

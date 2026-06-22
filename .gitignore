@@ -15,3 +15,7 @@ wheels/
 dev.db
 
 .vscode
+
+.pytest_cache
+# static
+static/uploads/properties/

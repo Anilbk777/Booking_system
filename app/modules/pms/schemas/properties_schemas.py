@@ -71,10 +71,10 @@ class PropertyBase(BaseModel):
     address: str = Field(..., min_length=2, max_length=255)
     latitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6)
     longitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6)
-    check_in_time_from: time = Time12Hour
-    check_in_time_to: time = Time12Hour
-    check_out_time_from: time = Time12Hour
-    check_out_time_to: time = Time12Hour
+    check_in_time_from: Time12Hour
+    check_in_time_to:Time12Hour
+    check_out_time_from: Time12Hour
+    check_out_time_to: Time12Hour
     number_of_floors: int = Field(default=1, ge=1)
     total_rooms: int = Field(default=0, ge=0)
     year_built: Optional[int] = Field(None, ge=1000, le=2100)
@@ -98,10 +98,10 @@ class PropertyUpdate(BaseModel):
     address: Optional[str] = Field(None, min_length=2, max_length=255)
     latitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6)
     longitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6)
-    check_in_time_from: Optional[time] = Time12Hour
-    check_in_time_to: Optional[time] = Time12Hour
-    check_out_time_from: Optional[time] = Time12Hour
-    check_out_time_to: Optional[time] = Time12Hour
+    check_in_time_from:  Optional[Time12Hour] = None
+    check_in_time_to: Optional[Time12Hour] = None
+    check_out_time_from: Optional[Time12Hour] = None
+    check_out_time_to: Optional[Time12Hour] = None
     number_of_floors: Optional[int] = Field(None, ge=1)
     total_rooms: Optional[int] = Field(None, ge=0)
     year_built: Optional[int] = Field(None, ge=1000, le=2100)
