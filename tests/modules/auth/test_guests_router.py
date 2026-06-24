@@ -13,8 +13,7 @@ async def test_register_guest(async_client: AsyncClient):
     payload = {
         "email": "guest@example.com",
         "password": "SecurePassword123!",
-        "first_name": "John",
-        "last_name": "Doe",
+        "full_name": "John Doe",
         "phone": "1234567890",
         "nationality": "US",
     }
@@ -75,8 +74,8 @@ async def test_get_current_guest(async_client: AsyncClient, token_store: dict):
     assert response.status_code == 200, response.text
     data = response.json()
     assert data["email"] == "guest@example.com"
-    assert data["first_name"] == "John"
-    assert data["last_name"] == "Doe"
+    assert data["full_name"] == "John Doe"
+   
 
 
 @pytest.mark.asyncio

@@ -63,8 +63,7 @@ class GuestService:
     async def _handle_inactive_guest(self, guest: Guest, new_data: dict) -> Guest:
         """Helper to reactivate/update an existing but unverified guest."""
         logger.info(f"[GuestService] Updating inactive guest: {guest.email}")
-        guest.first_name = new_data["first_name"]
-        guest.last_name = new_data["last_name"]
+        guest.full_name = new_data["full_name"]
         guest.phone = new_data.get("phone")
         guest.nationality = new_data.get("nationality")
         guest.password_hash = self.auth_service.get_password_hash(new_data["password"])
@@ -110,12 +109,10 @@ class GuestService:
             guest.is_active = True
             await self.guest_repository.update_guest(guest)
 
-            # Generate tokens upon successful verification
-            token_data = {"sub": str(guest.id), "role": "guest"}
+           
             return {
-                "access_token": self.auth_service.create_access_token(token_data),
-                "refresh_token": self.auth_service.create_refresh_token(token_data),
-                "token_type": "bearer",
+               "status":"success",
+               "message":"Account Verified Successfully"
             }
         except (UserNotFoundException, InvalidOTPException):
             raise

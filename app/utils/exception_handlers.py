@@ -15,7 +15,7 @@ app = FastAPI()
 # ── 1. Your custom exceptions ─────────────────────────────────
 @app.exception_handler(AppBaseException)
 async def handle_app_exception(request: Request, exc: AppBaseException):
-    logger.error(
+    logger.info(
         "[%s] %s | path=%s\n%s",
         exc.__class__.__name__,
         exc.internal_detail,
@@ -48,12 +48,12 @@ async def handle_request_validation_error(
         )
 
     # 2. Your existing formatting for standard field validation errors
-    field = " → ".join(str(loc) for loc in first_error["loc"][1:])
+    # field = " → ".join(str(loc) for loc in first_error["loc"][1:])
     message = first_error["msg"].replace("Value error, ", "")
 
     return JSONResponse(
         status_code=422,
-        content={"error": f"{field}: {message}"},
+        content={"error": f"{message}"},
     )
 
 

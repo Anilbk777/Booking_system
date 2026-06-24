@@ -10,6 +10,8 @@ from sqlalchemy import (
     DateTime,
     Boolean,
     Time,
+    UniqueConstraint,
+    Index,
 )
 from app.config.database_config import Base
 from typing import Optional, List
@@ -32,12 +34,12 @@ class Property(Base):
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    type: Mapped[str] = mapped_column(String(255), nullable=False, default="Hotel")
-    description: Mapped[str] = mapped_column(String(2000), nullable=True)
+    type: Mapped[str] = mapped_column(String(100), nullable=False, default="Hotel")
+    description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     country: Mapped[str] = mapped_column(String(255), nullable=False)
     state: Mapped[str] = mapped_column(String(255), nullable=False)
     city: Mapped[str] = mapped_column(String(255), nullable=False)
-    zip_code: Mapped[str] = mapped_column(String(255), nullable=False)
+    zip_code: Mapped[str] = mapped_column(String(20), nullable=False)
     address: Mapped[str] = mapped_column(String(500), nullable=False)
     latitude: Mapped[Decimal] = mapped_column(
         Numeric(precision=9, scale=6), nullable=True
@@ -46,6 +48,47 @@ class Property(Base):
         Numeric(precision=9, scale=6), nullable=True
     )
 
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    # Relationships
+    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="properties")
+    # uselist=False makes this a strict 1-to-1 relationship mapping
+    hotel_detail: Mapped["PropertyHotelDetail"] = relationship(
+        "PropertyHotelDetail",
+        back_populates="property",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    photos: Mapped[List["PropertyPhoto"]] = relationship(
+        "PropertyPhoto",
+        back_populates="property",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        # Prevent a tenant from creating duplicates of properties with the same name
+        UniqueConstraint("tenant_id", "name", name="uq_tenant_property_name"),
+        # Speed up regional filtering metrics dashboards or queries
+        Index("ix_properties_geo_location", "country", "state", "city"),
+    )
+
+
+class PropertyHotelDetail(Base):
+    __tablename__ = "property_hotel_details"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    property_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("properties.id", ondelete="CASCADE"),
+        index=True,
+        unique=True,
+        nullable=False,
+    )
     check_in_time_from: Mapped[time] = mapped_column(
         Time, default=time(9, 0), nullable=False
     )
@@ -66,18 +109,8 @@ class Property(Base):
         ARRAY(String(255)), nullable=True
     )
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
-
-    # Relationships
-    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="properties")
-    photos: Mapped[List["PropertyPhoto"]] = relationship(
-        "PropertyPhoto",
-        back_populates="property",
-        cascade="all, delete-orphan",
-        lazy="selectin",  # Automatically fetches photos efficiently using an IN clause when queried
+    property: Mapped["Property"] = relationship(
+        "Property", back_populates="hotel_detail"
     )
 
 
@@ -94,7 +127,7 @@ class PropertyPhoto(Base):
         nullable=False,
     )
     photo_url: Mapped[str] = mapped_column(
-        String(500),
+        String(2048),
         nullable=False,
     )
 
@@ -103,6 +136,4 @@ class PropertyPhoto(Base):
     )
 
     # Relationships
-    property: Mapped["Property"] = relationship(
-        "Property", back_populates="photos"
-    )
+    property: Mapped["Property"] = relationship("Property", back_populates="photos")

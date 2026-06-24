@@ -6,8 +6,7 @@ import uuid
 
 
 class UserBase(BaseModel):
-    first_name: Annotated[str, Field(..., min_length=2, max_length=50)]
-    last_name: Annotated[str, Field(..., min_length=2, max_length=50)]
+    full_name: Annotated[str, Field(..., min_length=2, max_length=50)]
     email: EmailStr
     phone: Annotated[Optional[str], Field(default=None, min_length=10, max_length=15)]
 
@@ -20,13 +19,12 @@ class UserBase(BaseModel):
             raise ValueError("Phone number must contain only digits")
         return v
 
-    @field_validator("first_name", "last_name")
+    @field_validator("full_name", mode="before")
     @classmethod
     def validate_name(cls, value: str) -> str:
         value = value.strip()
-        if not value.isalpha():
-            raise ValueError("Name must contain only alphabetic characters")
-
+        if not re.match(r"^[a-zA-Z\s]+$", value):
+            raise ValueError("Name must contain only alphabetic characters and spaces")
         return value
 
     @field_validator("email", mode="before")

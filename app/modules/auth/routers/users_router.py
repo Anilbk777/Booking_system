@@ -1,6 +1,11 @@
 from fastapi import APIRouter, Depends, status
 from app.modules.auth.schemas.users_schema import UserCreate, UserResponse
-from app.modules.auth.schemas.token_schema import Token, VerifyOTP, ResendOTP, RefreshTokenRequest
+from app.modules.auth.schemas.token_schema import (
+    Token,
+    VerifyOTP,
+    ResendOTP,
+    RefreshTokenRequest,
+)
 from app.modules.auth.services.users_services import UserService
 from app.modules.auth.dependencies import get_user_service
 from app.modules.auth.auth_middlewares import CurrentUser
@@ -10,9 +15,7 @@ from typing import Annotated
 router = APIRouter(prefix="/auth/users", tags=["Users"])
 
 
-@router.post(
-    "/register", status_code=status.HTTP_201_CREATED
-)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_user(
     user_create: UserCreate,
     user_service: UserService = Depends(get_user_service),
@@ -25,12 +28,14 @@ async def register_user(
     }
 
 
-@router.post("/verify-otp", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/verify-otp", status_code=status.HTTP_200_OK)
 async def verify_otp(
     verify_data: VerifyOTP,
     user_service: UserService = Depends(get_user_service),
 ):
-    return await user_service.verify_registration_otp(verify_data.email, verify_data.otp)
+    return await user_service.verify_registration_otp(
+        verify_data.email, verify_data.otp
+    )
 
 
 @router.post("/resend-otp", status_code=status.HTTP_200_OK)

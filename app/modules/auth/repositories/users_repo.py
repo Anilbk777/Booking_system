@@ -75,8 +75,7 @@ class UserRepository:
                 update(User)
                 .where(User.id == user.id)
                 .values(
-                    first_name=user.first_name,
-                    last_name=user.last_name,
+                    full_name=user.full_name,
                     phone=user.phone,
                     role=user.role,
                     tenant_id=user.tenant_id,

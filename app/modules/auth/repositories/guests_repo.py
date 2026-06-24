@@ -77,8 +77,7 @@ class GuestRepository:
                 update(Guest)
                 .where(Guest.id == guest.id)
                 .values(
-                    first_name=guest.first_name,
-                    last_name=guest.last_name,
+                    full_name=guest.full_name,
                     phone=guest.phone,
                     nationality=guest.nationality,
                     password_hash=guest.password_hash,

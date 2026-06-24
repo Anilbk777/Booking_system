@@ -12,7 +12,6 @@ logger = LoggerFactory.get_logger(__name__)
 
 class OTPService:
     def __init__(self, redis_client: Redis):
-        logger.info("[OTPService] Initializing OTPService")
         self.redis = redis_client
         self.ttl = int(os.getenv("OTP_EXPIRATION_SECONDS"))
 
@@ -94,4 +93,3 @@ class OTPService:
         except Exception as e:
             logger.error(f"[OTPService] Error verifying OTP: {str(e)}")
             raise ServiceException(str(e))
-

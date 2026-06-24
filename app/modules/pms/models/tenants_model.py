@@ -28,7 +28,7 @@ class Tenant(Base):
     )
     owner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey("users.id", ondelete="CASCADE", use_alter=True),
         index=True,
         nullable=False,
     )

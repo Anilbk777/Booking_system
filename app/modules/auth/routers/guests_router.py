@@ -4,7 +4,12 @@ from app.modules.auth.dependencies import get_guest_service
 from app.modules.auth.schemas.guests_schema import GuestCreate, GuestResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import Annotated
-from app.modules.auth.schemas.token_schema import Token, VerifyOTP, ResendOTP,RefreshTokenRequest
+from app.modules.auth.schemas.token_schema import (
+    Token,
+    VerifyOTP,
+    ResendOTP,
+    RefreshTokenRequest,
+)
 from app.modules.auth.auth_middlewares import CurrentGuest
 
 router = APIRouter(prefix="/auth/guests", tags=["guests"])
@@ -23,7 +28,7 @@ async def register_guest(
     }
 
 
-@router.post("/verify-otp", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/verify-otp", status_code=status.HTTP_200_OK)
 async def verify_otp(
     otp: VerifyOTP,
     guest_service: Annotated[GuestService, Depends(get_guest_service)],

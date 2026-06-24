@@ -65,8 +65,7 @@ class UserService:
     async def _handle_inactive_user(self, user: User, new_data: dict) -> User:
         """Helper to reactivate/update an existing but unverified user."""
         logger.info(f"[UserService] Updating inactive user: {user.email}")
-        user.first_name = new_data["first_name"]
-        user.last_name = new_data["last_name"]
+        user.full_name = new_data["full_name"]
         user.phone = new_data.get("phone")
         user.hashed_password = self.auth_service.get_password_hash(new_data["password"])
         user.role = "admin"
@@ -122,12 +121,9 @@ class UserService:
             user.is_active = True
             await self.user_repository.update_user(user)
 
-            # Generate tokens upon successful verification
-            token_data = {"sub": str(user.id), "role": user.role}
             return {
-                "access_token": self.auth_service.create_access_token(token_data),
-                "refresh_token": self.auth_service.create_refresh_token(token_data),
-                "token_type": "bearer",
+                "status": "success",
+                "message": "Account Verified Successfully"
             }
         except (UserNotFoundException, InvalidOTPException):
             raise

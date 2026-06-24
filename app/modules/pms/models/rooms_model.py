@@ -1,96 +1,131 @@
-# import uuid
-# from sqlalchemy.orm import Mapped, mapped_column, relationship
-# from sqlalchemy.dialects.postgresql import UUID
-# from sqlalchemy import (
-#     String,
-#     ForeignKey,
-#     Numeric,
-#     Integer,
-#     Boolean,
-#     Date,
-#     UniqueConstraint,
-#     CheckConstraint,
-#     ARRAY,
-#     Enum as SqlEnum,
-# )
-# from app.config.database_config import Base
-# from typing import Optional, List
-# from enum import StrEnum
-# from app.modules.pms.models.properties_model import Property
-# from datetime import date
-
-# class RoomTypes(StrEnum):
-#     STANDARD = "Standard"
-#     DELUXE = "Deluxe"
-#     SUITE = "Suite"
-#     TWIN = "Twin"
-#     DOUBLE = "Double"
-#     SINGLE = "Single"
+import uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    String,
+    ForeignKey,
+    Numeric,
+    Integer,
+    Boolean,
+    Date,
+    UniqueConstraint,
+    CheckConstraint,
+    ARRAY,
+    Enum as SqlEnum,
+)
+from app.config.database_config import Base
+from typing import Optional, List
+from enum import StrEnum
+from app.modules.pms.models.properties_model import Property
+from datetime import date
 
 
-# class BedType(StrEnum):
-#     KING = "King"
-#     QUEEN = "Queen"
-#     TWIN = "Twin"
-#     DOUBLE = "Double"
-#     SINGLE = "Single"
+class RoomType(Base):
+    __tablename__ = "room_types"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    property_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("properties.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    room_name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # relationships
+    property: Mapped["Property"] = relationship("Property", back_populates="room_types")
 
 
-# class RoomStatus(StrEnum):
-#     AVAILABLE = "Available"
-#     OCCUPIED = "Occupied"
-#     MAINTENANCE = "Maintenance"
-#     CLEAN = "Clean"
-#     DIRTY = "Dirty"
+class Bed_Type(Base):
+    __tablename__ = "bed_types"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    room_type_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("room_types.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    bed_name: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
-# class RoomType(Base):
-#     __tablename__ = "room_types"
+class Rooms(Base):
+    __tablename__ = "rooms"
 
-#     id: Mapped[uuid.UUID] = mapped_column(
-#         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-#     )
-#     property_id: Mapped[uuid.UUID] = mapped_column(
-#         UUID(as_uuid=True),
-#         ForeignKey("properties.id", ondelete="CASCADE"),
-#         index=True,
-#         nullable=False,
-#     )
-#     name: Mapped[RoomTypes] = mapped_column(
-#         SqlEnum(RoomTypes, native_enum=False, length=50), nullable=False, default=RoomTypes.STANDARD
-#     )
-#     description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
-#     max_occupancy: Mapped[int] = mapped_column(
-#         Integer,
-#         CheckConstraint(
-#             "max_occupancy >= 1 AND max_occupancy <= 30", name="chk_max_occupancy_range"
-#         ),
-#         default=2,
-#         nullable=False,
-#     )
-#     bed_type: Mapped[BedType] = mapped_column(
-#         SqlEnum(BedType, native_enum=False, length=50), nullable=False, default=BedType.SINGLE
-#     )
-#     base_rate: Mapped[float] = mapped_column(
-#         Numeric(10, 2),
-#         CheckConstraint("base_rate >= 0 ", name="chk_base_rate_positive"),
-#         nullable=True,
-#     )
-#     photos: Mapped[Optional[List[str]]] = mapped_column(
-#         ARRAY(String(2048)),
-#         nullable=True,
-#         default=list,
-#     )
-#     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    property_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("properties.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    room_type_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("room_types.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    bed_type_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("bed_types.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    floor_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    room_name: Mapped[str] = mapped_column(String(100), nullable=False)
 
-#     # Relationships
-#     property: Mapped["Property"] = relationship("Property", back_populates="room_types")
-#     room_units: Mapped[List["RoomUnit"]] = relationship(
-#         "PropertyRoomUnit", back_populates="room_type", cascade="all, delete-orphan"
-#     )
-#     rate_plans: Mapped[List["RatePlan"]] = relationship(
-#         "RatePlan", back_populates="room_type", cascade="all, delete-orphan"
-#     )
+    max_adults: Mapped[int] = mapped_column(
+        Integer,
+        CheckConstraint(
+            "max_adults >= 1 AND max_adults <= 30", name="chk_max_adults_range"
+        ),
+        default=2,
+        nullable=False,
+    )
+    max_children: Mapped[int] = mapped_column(
+        Integer,
+        CheckConstraint(
+            "max_children >= 0 AND max_children <= 15", name="chk_max_children_range"
+        ),
+        default=0,
+        nullable=False,
+    )
+    amenaties: Mapped[List[str]] = mapped_column(ARRAY(String(255)), nullable=False)
+
+    base_rate: Mapped[float] = mapped_column(
+        Numeric(10, 2),
+        CheckConstraint("base_rate >= 0 ", name="chk_base_rate_positive"),
+        nullable=True,
+    )
+    cancellation_policy: Mapped[str] = mapped_column(String(1000), nullable=True)
+    # Relationships
+    property: Mapped["Property"] = relationship("Property", back_populates="rooms")
+    room_photos: Mapped[List["RoomPhoto"]] = relationship(
+        "RoomPhoto", back_populates="room", cascade="all, delete-orphan"
+    )
+
+
+class RoomPhoto(Base):
+    __tablename__ = "room_photos"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    room_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("rooms.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    photo_url: Mapped[str] = mapped_column(String(2048), nullable=True)
+
+    room: Mapped["Room"] = relationship("Room", back_populates="room_photos")
 
 
 # class PropertyRoomUnit(Base):
