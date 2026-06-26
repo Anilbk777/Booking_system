@@ -51,6 +51,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme_user), user_servic
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
     return user
 
 

@@ -1,24 +1,23 @@
-# from app.modules.pms.repositories.room_repo import RoomRepository
-# from app.modules.pms.models.rooms_model import RoomType, RatePlan, DateOverride, DiscountCode
-# from app.modules.pms.repositories.properties_repo import PropertyRepository
+from app.modules.pms.repositories.room_repo import RoomRepository
+from app.modules.pms.models.rooms_model import RoomType,BedType, Rooms, RoomPhoto, RoomAmenity
 
-# from app.utils.exceptions import (
-#     ServiceException,
-#     PropertyNotFoundException,
-#     UnauthorizedException,
-#     RoomTypeNotFoundException,
-#     RatePlanNotFoundException,
-# )
-# from app.utils.logging import LoggerFactory
-# import uuid
+from app.utils.exceptions import (
+    ServiceException,
+    PropertyNotFoundException,
+    UnauthorizedException,
+    RoomTypeNotFoundException,
+    RatePlanNotFoundException,
+)
+from app.utils.logging import LoggerFactory
+import uuid
 
-# logger = LoggerFactory.get_logger(__name__)
+logger = LoggerFactory.get_logger(__name__)
 
 
-# class RoomService:
-#     def __init__(self, room_repo: RoomRepository, property_repo: PropertyRepository):
-#         self.room_repo = room_repo
-#         self.property_repo = property_repo
+class RoomService:
+    def __init__(self, room_repo: RoomRepository, property_repo: PropertyRepository):
+        self.room_repo = room_repo
+        self.property_repo = property_repo
 
 #     async def _validate_property(self, property_id: uuid.UUID, tenant_id: uuid.UUID):
 #         property_obj = await self.property_repo.get_property_by_id(

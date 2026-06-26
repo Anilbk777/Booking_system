@@ -46,12 +46,12 @@ class RoomType(Base, TimestampMixin):
     __table_args__ = (
         # Prevent duplicate custom type names per hotel
         UniqueConstraint(
-            "hotel_detail_id", "room_name", name="uq_room_types_hotel_detail_id_room_name"
+            "hotel_detail_id", "room_type_name", name="uq_room_types_hotel_detail_id_room_type_name"
         ),
-        # Among global defaults, room_name must be unique
+        # Among global defaults, room_type_name must be unique
         Index(
             "ix_room_types_unique_default_name",
-            "room_name",
+            "room_type_name",
             unique=True,
             postgresql_where=text("is_default = true"),
         ),
@@ -67,7 +67,7 @@ class RoomType(Base, TimestampMixin):
         nullable=True,
         index=True,
     )
-    room_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    room_type_name: Mapped[str] = mapped_column(String(100), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -139,7 +139,6 @@ class RoomPhoto(Base, TimestampMixin):
         nullable=False,
     )
     photo_url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    # is_cover replaces the removed circular Rooms.photo_id FK
     is_cover: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
