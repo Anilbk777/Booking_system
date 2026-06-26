@@ -1,11 +1,13 @@
 import traceback
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
-from app.utils.logging import LoggerFactory
+
 from app.utils.exceptions import AppBaseException
+from app.utils.logging import LoggerFactory
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -24,7 +26,7 @@ async def handle_app_exception(request: Request, exc: AppBaseException):
     )
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": exc.user_message},
+        content={"success": False, "error": exc.user_message},
     )
 
 
@@ -44,7 +46,7 @@ async def handle_request_validation_error(
     if first_error.get("type") == "json_invalid":
         return JSONResponse(
             status_code=400,
-            content={"error": "Invalid JSON payload format."},
+            content={"success": False, "error": "Invalid JSON payload format."},
         )
 
     # 2. Your existing formatting for standard field validation errors
@@ -53,7 +55,7 @@ async def handle_request_validation_error(
 
     return JSONResponse(
         status_code=422,
-        content={"error": f"{message}"},
+        content={"success": False, "error": f"{message}"},
     )
 
 
@@ -70,7 +72,7 @@ async def handle_pydantic_validation_error(request: Request, exc: ValidationErro
     )
     return JSONResponse(
         status_code=500,
-        content={"error": "An internal data error occurred."},
+        content={"success": False, "error": "An internal data error occurred."},
     )
 
 
@@ -87,7 +89,7 @@ async def handle_http_exception(request: Request, exc: HTTPException):
         )
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": exc.detail},
+        content={"success": False, "error": exc.detail},
     )
 
 
@@ -110,7 +112,7 @@ async def handle_integrity_error(request: Request, exc: IntegrityError):
 
     return JSONResponse(
         status_code=400,
-        content={"error": error_msg},
+        content={"success": False, "error": error_msg},
     )
 
 
@@ -125,7 +127,10 @@ async def handle_unexpected_exception(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=500,
-        content={"error": "An unexpected error occurred. Please contact support."},
+        content={
+            "success": False,
+            "error": "An unexpected error occurred. Please contact support.",
+        },
     )
 
 

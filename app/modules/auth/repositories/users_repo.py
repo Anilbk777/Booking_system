@@ -48,6 +48,7 @@ class UserRepository:
             result = await self.session.execute(select(User).where(User.email == email))
             user = result.scalar_one_or_none()
             return user
+            
         except Exception as e:
             logger.error(f"[UserRepository] Error getting user by email: {str(e)}")
             raise RepositoryException(

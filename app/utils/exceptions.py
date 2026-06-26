@@ -89,7 +89,7 @@ class UserNotFoundException(AppBaseException):
 
     def __init__(self, user_message: str, internal_detail: str = None):
         super().__init__(
-            user_message=user_message, internal_detail=internal_detail, status_code=404
+            user_message=user_message, internal_detail=internal_detail, status_code=400
         )
 
 
@@ -194,4 +194,13 @@ class InvalidImageException(AppBaseException):
             user_message=user_message,
             internal_detail=internal_detail,
             status_code=400,
+        )
+
+
+class DefaultAmenityNotExistsException(AppBaseException):
+    """Raised when a default amenity does not exist in the system."""
+
+    def __init__(self, user_message: str):
+        super().__init__(
+            user_message=user_message, internal_detail=user_message, status_code=400
         )

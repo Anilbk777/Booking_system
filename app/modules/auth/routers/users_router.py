@@ -53,7 +53,7 @@ async def login_user(
     user_service: UserService = Depends(get_user_service),
 ):
     user_info = {
-        "email": user_data.username,
+        "email": user_data.username ,
         "password": user_data.password,
     }
     return await user_service.login_user(user_info)

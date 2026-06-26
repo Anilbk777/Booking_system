@@ -54,7 +54,7 @@ class UserCreate(UserBase):
         if not special_char_regex.search(value):
             raise ValueError("Password must contain at least one special character.")
 
-        return value
+        return value.strip()
 
 
 class UserResponse(UserBase):

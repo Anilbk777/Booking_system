@@ -14,7 +14,7 @@ from app.utils.exceptions import (
     AccountInactiveException,
     AccountActiveException,
     InvalidOTPException,
-    UnauthorizedException
+    UnauthorizedException,
 )
 from app.utils.logging import LoggerFactory
 import uuid
@@ -44,7 +44,7 @@ class UserService:
         )
         try:
             existing_user = await self.user_repository.get_user_by_email(
-                user_data["email"]
+                user_data.get("email")
             )
 
             if existing_user:
@@ -121,10 +121,7 @@ class UserService:
             user.is_active = True
             await self.user_repository.update_user(user)
 
-            return {
-                "status": "success",
-                "message": "Account Verified Successfully"
-            }
+            return {"status": "success", "message": "Account Verified Successfully"}
         except (UserNotFoundException, InvalidOTPException):
             raise
         except Exception as e:
@@ -155,12 +152,14 @@ class UserService:
     async def login_user(self, credentials: dict) -> dict:
         logger.info(f"[UserService] Login attempt: {credentials['email']}")
         try:
-            user = await self.user_repository.get_user_by_email(credentials["email"])
+            email = credentials["email"].strip()
+            password = credentials["password"].strip()
+            user = await self.user_repository.get_user_by_email(email)
             if not user or not self.auth_service.verify_password(
-                credentials["password"], user.hashed_password
+                password, user.hashed_password
             ):
                 raise UserNotFoundException(
-                    "Invalid credentials", "Email/Password mismatch"
+                    "Invalid credentials", "Incorrect email or password"
                 )
 
             if not user.is_active:

@@ -1,27 +1,41 @@
 import uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import String, ForeignKey, UniqueConstraint, Enum as SqlEnum, DateTime
-from app.config.database_config import Base
-from datetime import datetime, UTC
-from typing import Optional, List
+from datetime import datetime
 from enum import StrEnum
+from typing import List, Optional
+
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy import (
+    Enum as SqlEnum,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.config.database_config import Base
 
 
 class Plan(StrEnum):
-    FREE = "Free"
-    PREMIUM = "Premium"
-    ENTERPRISE = "Enterprise"
+    FREE = "FREE"
+    PREMIUM = "PREMIUM"
+    ENTERPRISE = "ENTERPRISE"
 
 
 class Status(StrEnum):
-    ACTIVE = "Active"
-    INACTIVE = "Inactive"
-    SUSPENDED = "Suspended"
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    SUSPENDED = "SUSPENDED"
 
 
 class Tenant(Base):
     __tablename__ = "tenants"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "name", name="uq_tenant_owner_name"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -46,13 +60,14 @@ class Tenant(Base):
         String(3), default="USD", nullable=False
     )
     timezone: Mapped[str] = mapped_column(String(100), default="UTC", nullable=False)
+    # Both timestamps use server_default so DB clock is the single source of truth
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    __table_args__ = (
-        UniqueConstraint("owner_id", "name", name="uq_tenant_owner_name"),
-    )
     # --- Relationships ---
     # 1. The specific Admin who created/owns this workspace
     owner: Mapped["User"] = relationship(

@@ -1,26 +1,31 @@
-# from app.modules.pms.models import RoomType, BedType, Rooms
 import uuid
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import (
-    String,
-    ForeignKey,
-    Numeric,
-    Integer,
-    DateTime,
-    Boolean,
-    Time,
-    Enum as SqlEnum,
-    UniqueConstraint,
-    Index,
-    CheckConstraint,
-    func,
-)
-from app.config.database_config import Base
-from typing import Optional, List
 from datetime import datetime, time
 from decimal import Decimal
 from enum import StrEnum
+from typing import List, Optional
+
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Time,
+    UniqueConstraint,
+    func,
+    text,
+)
+from sqlalchemy import (
+    Enum as SqlEnum,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.config.database_config import Base
 from app.modules.pms.models.tenants_model import Tenant
 
 
@@ -36,13 +41,10 @@ class PropertyType(StrEnum):
 
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), # Tells PostgreSQL to store TZ info
-        server_default=func.now()
+        DateTime(timezone=True), server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now()
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 
@@ -94,18 +96,29 @@ class Property(Base, TimestampMixin):
         back_populates="property",
         uselist=False,
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     photos: Mapped[List["PropertyPhoto"]] = relationship(
         "PropertyPhoto",
         back_populates="property",
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )
-    amenities: Mapped[List["PropertyAmenity"]] = relationship(
+    # 1. Direct one-to-many relationship: Custom amenities *owned* by this specific property
+    owned_custom_amenities: Mapped[List["Amenity"]] = relationship(
+        "Amenity",
+        back_populates="owning_property",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # 2. Direct junction relationship: Which records are selected for this property
+    property_amenities: Mapped[List["PropertyAmenity"]] = relationship(
         "PropertyAmenity",
         back_populates="property",
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )
-
 
 # ---------------------------------------------------------------------------
 # PropertyHotelDetail
@@ -183,7 +196,7 @@ class PropertyHotelDetail(Base, TimestampMixin):
 # ---------------------------------------------------------------------------
 
 
-class PropertyPhoto(Base, TimestampMixin):  # Fix #8 — TimestampMixin adds updated_at
+class PropertyPhoto(Base, TimestampMixin):
     __tablename__ = "property_photos"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -196,18 +209,17 @@ class PropertyPhoto(Base, TimestampMixin):  # Fix #8 — TimestampMixin adds upd
         nullable=False,
     )
     photo_url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships
     property: Mapped["Property"] = relationship("Property", back_populates="photos")
 
 
 # ---------------------------------------------------------------------------
-# Amenity  — default + per-property custom, isolated per property
+# Amenity  — global defaults (property_id IS NULL) + per-property custom amenities
 # ---------------------------------------------------------------------------
 
 
-class Amenity(Base, TimestampMixin):  # Fix #8 — TimestampMixin adds updated_at
+class Amenity(Base, TimestampMixin):
     __tablename__ = "amenities"
     __table_args__ = (
         # A property cannot have two custom amenities with the same name
@@ -216,11 +228,17 @@ class Amenity(Base, TimestampMixin):  # Fix #8 — TimestampMixin adds updated_a
             "name",
             name="uq_amenities_property_id_name",
         ),
+        # Among global defaults, name must be globally unique
         Index(
             "ix_amenities_unique_default_name",
             "name",
             unique=True,
-            postgresql_where="is_default = true",
+            postgresql_where=text("is_default = true"),
+        ),
+        # A global default amenity must NOT belong to a specific property
+        CheckConstraint(
+            "NOT (is_default = true AND property_id IS NOT NULL)",
+            name="chk_default_amenity_no_property",
         ),
     )
 
@@ -236,13 +254,19 @@ class Amenity(Base, TimestampMixin):  # Fix #8 — TimestampMixin adds updated_a
         index=True,
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    is_default: Mapped[bool] = mapped_column(  # Fix #3 + amenity isolation
-        Boolean, nullable=False, default=False
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # Back-populates the direct ownership line
+    owning_property: Mapped[Optional["Property"]] = relationship(
+        "Property", back_populates="owned_custom_amenities"
     )
 
-    # Relationships
-    properties: Mapped[List["PropertyAmenity"]] = relationship(  # Fix #1 — was missing
-        "PropertyAmenity", back_populates="amenity"
+    # Back-populates tracking selections inside the intermediate junction mapping
+    property_amenities: Mapped[List["PropertyAmenity"]] = relationship(
+        "PropertyAmenity",
+        back_populates="amenity",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 
@@ -278,9 +302,10 @@ class PropertyAmenity(Base, TimestampMixin):
     )
 
     # Relationships
-    property: Mapped["Property"] = relationship(  # Fix #1 — back_populates now exists
-        "Property", back_populates="amenities"
+    # Clean direct back-references to both tables
+    property: Mapped["Property"] = relationship(
+        "Property", back_populates="property_amenities"
     )
-    amenity: Mapped["Amenity"] = relationship(  # Fix #1 — back_populates now exists
-        "Amenity", back_populates="properties"
+    amenity: Mapped["Amenity"] = relationship(
+        "Amenity", back_populates="property_amenities"
     )

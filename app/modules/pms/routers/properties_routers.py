@@ -1,32 +1,69 @@
-# from fastapi import APIRouter, Depends, status, UploadFile, File, HTTPException
-# from app.modules.pms.schemas.properties_schemas import (
-#     PropertyCreate,
-#     PropertyResponse,
-#     PropertyUpdate,
-#     PropertyPhotoResponse,
-# )
-# from app.modules.pms.services.properties_scervices import PropertyService
-# from app.modules.pms.dependencies import get_property_service
-# from app.modules.auth.auth_middlewares import CurrentUser
-# import uuid
+import uuid
 
-# router = APIRouter(prefix="/pms/properties", tags=["Property Management System"])
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+
+from app.modules.auth.auth_middlewares import CurrentUser
+from app.modules.pms.dependencies import get_property_service
+from app.modules.pms.schemas.properties_schemas import (
+    AmenityResponse,
+    PropertyCreate,
+    PropertyHotelDetailResponse,
+    PropertyPhotoResponse,
+    PropertyResponse,
+)
+from app.modules.pms.services.properties_scervices import PropertyService
+from app.utils.schemas import StandardResponse
+
+router = APIRouter(prefix="/pms/properties", tags=["Property Management System"])
 
 
-# @router.post("/", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED)
-# async def create_property(
-#     property_data: PropertyCreate,
-#     current_user: CurrentUser,
-#     property_service: PropertyService = Depends(get_property_service),
-# ):
-#     if current_user.tenant_id is None:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="You are not authorized to create a property. You should have a tenant.",
-#         )
-#     return await property_service.create_property(
-#         property_data.model_dump(), current_user.tenant_id
-#     )
+@router.post(
+    "/",
+    response_model=StandardResponse[PropertyResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_property(
+    payload: PropertyCreate,
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not authorized to create a property. You should have a tenant.",
+        )
+    response = await property_service.create_property(
+        payload=payload,
+        tenant_id=current_user.tenant_id,
+    )
+    property_data = PropertyResponse(
+        id=response["property"].id,
+        tenant_id=response["property"].tenant_id,
+        is_active=response["property"].is_active,
+        name=response["property"].name,
+        type=response["property"].type,
+        description=response["property"].description,
+        country=response["property"].country,
+        state=response["property"].state,
+        city=response["property"].city,
+        zip_code=response["property"].zip_code,
+        address=response["property"].address,
+        latitude=response["property"].latitude,
+        longitude=response["property"].longitude,
+        created_at=response["property"].created_at,
+        updated_at=response["property"].updated_at,
+        hotel_detail=PropertyHotelDetailResponse.model_validate(
+            response["hotel_detail"]
+        ),
+        photos=[
+            PropertyPhotoResponse.model_validate(photo)
+            for photo in response["photo_urls"]
+        ],
+        amenities=[
+            AmenityResponse.model_validate(amenity) for amenity in response["amenities"]
+        ],
+    )
+    return {"success": True, "data": property_data}
 
 
 # @router.get(

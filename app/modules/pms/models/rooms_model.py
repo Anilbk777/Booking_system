@@ -10,17 +10,14 @@ from sqlalchemy import (
     Boolean,
     UniqueConstraint,
     CheckConstraint,
-    ARRAY,
     Enum as SqlEnum,
     Index,
-    DateTime,
-    func,
+    text,
 )
 from app.config.database_config import Base
 from typing import Optional, List
 from enum import StrEnum
-from app.modules.pms.models.properties_model import PropertyHotelDetail
-from datetime import datetime
+from app.modules.pms.models.properties_model import PropertyHotelDetail, TimestampMixin
 
 
 class RoomStatus(StrEnum):
@@ -40,21 +37,6 @@ class CancellationPolicy(StrEnum):
 
 
 # ---------------------------------------------------------------------------
-# Mixins
-# ---------------------------------------------------------------------------
-
-
-class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),  # Tells PostgreSQL to store TZ info
-        server_default=func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-
-# ---------------------------------------------------------------------------
 # RoomType
 # ---------------------------------------------------------------------------
 
@@ -62,21 +44,23 @@ class TimestampMixin:
 class RoomType(Base, TimestampMixin):
     __tablename__ = "room_types"
     __table_args__ = (
-        # prevent duplicate custom type names per property
+        # Prevent duplicate custom type names per hotel
         UniqueConstraint(
             "hotel_detail_id", "room_name", name="uq_room_types_hotel_detail_id_room_name"
         ),
+        # Among global defaults, room_name must be unique
         Index(
             "ix_room_types_unique_default_name",
             "room_name",
             unique=True,
-            postgresql_where="is_default = true",
+            postgresql_where=text("is_default = true"),
         ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # NULL → global default available to all hotels; <id> → custom for that hotel only
     hotel_detail_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("property_hotel_details.id", ondelete="CASCADE"),
@@ -88,7 +72,7 @@ class RoomType(Base, TimestampMixin):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships
-    property_Hotel: Mapped["PropertyHotelDetail"] = relationship(
+    hotel_detail: Mapped["PropertyHotelDetail"] = relationship(
         "PropertyHotelDetail", back_populates="room_types"
     )
     rooms: Mapped[List["Rooms"]] = relationship("Rooms", back_populates="room_type")
@@ -101,24 +85,37 @@ class RoomType(Base, TimestampMixin):
 
 class BedType(Base, TimestampMixin):
     __tablename__ = "bed_types"
+    __table_args__ = (
+        # Prevent duplicate custom bed names per hotel
+        UniqueConstraint(
+            "hotel_detail_id", "bed_name", name="uq_bed_types_hotel_detail_bed_name"
+        ),
+        # Among global defaults, bed_name must be unique
+        Index(
+            "ix_bed_types_unique_default_name",
+            "bed_name",
+            unique=True,
+            postgresql_where=text("is_default = true"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # NULL → global default; <id> → custom for that hotel only
     hotel_detail_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("property_hotel_details.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
-
     bed_name: Mapped[str] = mapped_column(String(100), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # sort_order so defaults appear before customs in dropdowns
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships
-    property_Hotel: Mapped["PropertyHotelDetail"] = relationship(
+    hotel_detail: Mapped["PropertyHotelDetail"] = relationship(
         "PropertyHotelDetail", back_populates="bed_types"
     )
     rooms: Mapped[List["Rooms"]] = relationship("Rooms", back_populates="bed_type")
@@ -142,8 +139,46 @@ class RoomPhoto(Base, TimestampMixin):
         nullable=False,
     )
     photo_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    # is_cover replaces the removed circular Rooms.photo_id FK
+    is_cover: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    # Relationships
     room: Mapped["Rooms"] = relationship("Rooms", back_populates="room_photos")
+
+
+# ---------------------------------------------------------------------------
+# RoomAmenity — proper join table replacing the ARRAY(String) field
+# ---------------------------------------------------------------------------
+
+
+class RoomAmenity(Base, TimestampMixin):
+    __tablename__ = "room_amenities"
+    __table_args__ = (
+        UniqueConstraint(
+            "room_id", "amenity_id", name="uq_room_amenities_room_amenity"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    room_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("rooms.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    # References the shared Amenity catalogue (global defaults + property customs)
+    amenity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("amenities.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    # Relationships
+    room: Mapped["Rooms"] = relationship("Rooms", back_populates="room_amenities")
 
 
 # ---------------------------------------------------------------------------
@@ -188,21 +223,11 @@ class Rooms(Base, TimestampMixin):
         index=True,
         nullable=False,
     )
-    photo_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("room_photos.id", ondelete="CASCADE"),
-        index=True,
-        nullable=True,
-    )
-    floor_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # 0 = ground floor; constraint allows >= 0
+    floor_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     room_name: Mapped[str] = mapped_column(String(100), nullable=False)
     max_adults: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
     max_children: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-
-    amenities: Mapped[List[str]] = mapped_column(
-        ARRAY(String(100)), nullable=False, default=list
-    )
-
     base_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
     status: Mapped[RoomStatus] = mapped_column(
         SqlEnum(RoomStatus, native_enum=False, length=50),
@@ -210,7 +235,8 @@ class Rooms(Base, TimestampMixin):
         nullable=False,
     )
     cancellation_policy: Mapped[CancellationPolicy] = mapped_column(
-        SqlEnum(CancellationPolicy, native_enum=False, length=20),
+        # length=50 — gives room for future longer values like PARTIALLY_REFUNDABLE
+        SqlEnum(CancellationPolicy, native_enum=False, length=50),
         nullable=False,
         default=CancellationPolicy.FLEXIBLE,
     )
@@ -219,7 +245,7 @@ class Rooms(Base, TimestampMixin):
     )
 
     # Relationships
-    property_Hotel: Mapped["PropertyHotelDetail"] = relationship(
+    hotel_detail: Mapped["PropertyHotelDetail"] = relationship(
         "PropertyHotelDetail", back_populates="rooms"
     )
     room_photos: Mapped[List["RoomPhoto"]] = relationship(
@@ -230,3 +256,6 @@ class Rooms(Base, TimestampMixin):
     )
     bed_type: Mapped["BedType"] = relationship("BedType", back_populates="rooms")
     room_type: Mapped["RoomType"] = relationship("RoomType", back_populates="rooms")
+    room_amenities: Mapped[List["RoomAmenity"]] = relationship(
+        "RoomAmenity", back_populates="room", cascade="all, delete-orphan"
+    )
