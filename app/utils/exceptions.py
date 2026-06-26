@@ -204,3 +204,32 @@ class DefaultAmenityNotExistsException(AppBaseException):
         super().__init__(
             user_message=user_message, internal_detail=user_message, status_code=400
         )
+
+
+class HotelNotFoundException(AppBaseException):
+    """Raised when a hotel with the given ID is not found."""
+
+    def __init__(self, internal_detail: str):
+        super().__init__(
+            user_message="Hotel not found",
+            internal_detail=internal_detail,
+            status_code=404,
+        )
+
+
+class RoomNameAlreadyExistsException(AppBaseException):
+    def __init__(self, user_message, status_code=400):
+        super().__init__(
+            user_message=user_message,
+            internal_detail=user_message,
+            status_code=status_code,
+        )
+
+
+class InvalidDateException(AppBaseException):
+    def __init__(self, user_message, status_code=400):
+        super().__init__(
+            user_message=user_message,
+            internal_detail=user_message,
+            status_code=status_code,
+        )

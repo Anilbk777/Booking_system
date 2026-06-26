@@ -1,15 +1,24 @@
-from app.modules.pms.repositories.room_repo import RoomRepository
-from app.modules.pms.models.rooms_model import RoomType,BedType, Rooms, RoomPhoto, RoomAmenity
+import uuid
 
+from app.modules.pms.models.rooms_model import (
+    BedType,
+    RoomAmenity,
+    RoomPhoto,
+    Rooms,
+    RoomType,
+)
+from app.modules.pms.repositories.properties_repo import PropertyRepository
+from app.modules.pms.repositories.room_repo import RoomRepository
+from app.modules.pms.schemas.room_schemas import RoomsCreate
 from app.utils.exceptions import (
-    ServiceException,
+    HotelNotFoundException,
     PropertyNotFoundException,
+    RepositoryException,
+    RoomNameAlreadyExistsException,
+    ServiceException,
     UnauthorizedException,
-    RoomTypeNotFoundException,
-    RatePlanNotFoundException,
 )
 from app.utils.logging import LoggerFactory
-import uuid
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -19,16 +28,65 @@ class RoomService:
         self.room_repo = room_repo
         self.property_repo = property_repo
 
-#     async def _validate_property(self, property_id: uuid.UUID, tenant_id: uuid.UUID):
-#         property_obj = await self.property_repo.get_property_by_id(
-#             property_id, tenant_id
-#         )
-#         if not property_obj:
-#             raise PropertyNotFoundException("Property not found")
+    async def _validate_property(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID, hotel_id: uuid.UUID
+    ):
+        property_obj = await self.property_repo.get_property_by_id(
+            property_id, tenant_id
+        )
+        if not property_obj:
+            raise PropertyNotFoundException("Property not found")
 
-#         if property_obj.tenant_id != tenant_id:
-#             raise UnauthorizedException("You do not own this property")
-#         return property_obj
+        if property_obj.tenant_id != tenant_id:
+            raise UnauthorizedException("You do not own this property")
+
+        hotel_detail = await self.property_repo.get_hotel_detail_by_property_id(
+            property_id=property_id, hotel_id=hotel_id
+        )
+        if not hotel_detail or hotel_detail.property_id != property_id:
+            raise HotelNotFoundException("Hotel detail not found for this property")
+
+        return None
+
+    async def create_rooms(
+        self,
+        property_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        hotel_id: uuid.UUID,
+        payload: RoomsCreate,
+    ):
+        logger.info(
+            f"[RoomService] Creating rooms for property {property_id} and hotel {hotel_id}"
+        )
+        try:
+            await self._validate_property(property_id, tenant_id, hotel_id)
+
+            # from the models to prevent Pydantic models from converting into sub-dictionaries.
+            rooms_data = []
+            for room in payload.rooms:
+                room_dict = room.model_dump(exclude={"photos", "amenities"})
+                room_dict["photos"] = room.photos  # Keeps as clean list[str]
+                room_dict["amenities"] = room.amenities  # Keeps as clean list[UUID]
+                rooms_data.append(room_dict)
+
+            # Delegate execution to the refactored loop method
+            return await self.room_repo.create_rooms(rooms_data, hotel_id)
+
+        except (
+            PropertyNotFoundException,
+            UnauthorizedException,
+            HotelNotFoundException,
+        ):
+            logger.warning(
+                "[RoomService] Validation rules failed before transaction initialization."
+            )
+            raise
+        except (RoomNameAlreadyExistsException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[RoomService] Error executing room creation batch: {str(e)}")
+            raise ServiceException(str(e))
+
 
 #     async def create_room_type(
 #         self, room_type_data: dict, property_id: uuid.UUID, tenant_id: uuid.UUID
@@ -146,4 +204,3 @@ class RoomService:
 #     async def get_discount_codes(self, property_id: uuid.UUID, tenant_id: uuid.UUID) -> list[DiscountCode]:
 #         await self._validate_property(property_id, tenant_id)
 #         return await self.room_repo.get_discount_codes(property_id)
-  

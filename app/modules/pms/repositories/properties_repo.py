@@ -2,7 +2,7 @@ import uuid
 from typing import Any, Awaitable, Callable, TypeVar
 
 from sqlalchemy import and_, delete, func, or_, select, update
-from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -49,23 +49,6 @@ logger = LoggerFactory.get_logger(__name__)
 #         except Exception as e:
 #             await self.db.rollback()
 #             logger.error(f"[PropertyRepository] Error creating property: {str(e)}")
-#             raise RepositoryException(str(e))
-
-#     async def get_property_by_id(
-#         self, property_id: uuid.UUID, tenant_id: uuid.UUID
-#     ) -> Property | None:
-#         logger.info(f"[PropertyRepository] Getting property by id: {property_id}")
-#         try:
-#             result = await self.db.execute(
-#                 select(Property).where(
-#                     Property.id == property_id,
-#                     Property.tenant_id == tenant_id,
-#                 )
-#             )
-#             property = result.scalar_one_or_none()
-#             return property
-#         except Exception as e:
-#             logger.error(f"[PropertyRepository] Error getting property by id: {str(e)}")
 #             raise RepositoryException(str(e))
 
 
@@ -141,6 +124,23 @@ class PropertyRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def get_property_by_id(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID
+    ) -> Property | None:
+        logger.info(f"[PropertyRepository] Getting property by id: {property_id}")
+        try:
+            result = await self.db.execute(
+                select(Property).where(
+                    Property.id == property_id,
+                    Property.tenant_id == tenant_id,
+                )
+            )
+            property = result.scalar_one_or_none()
+            return property
+        except Exception as e:
+            logger.error(f"[PropertyRepository] Error getting property by id: {str(e)}")
+            raise RepositoryException(str(e))
+
     async def get_property_by_name(
         self, property_name: str, tenant_id: uuid.UUID
     ) -> Property | None:
@@ -163,9 +163,7 @@ class PropertyRepository:
     async def get_existing_amenities(self) -> list[Amenity]:
         logger.info("[PropertyRepository] Fetching existing amenities")
         try:
-            result = await self.db.execute(
-                select(Amenity).where(Amenity.is_default)
-            )
+            result = await self.db.execute(select(Amenity).where(Amenity.is_default))
             return list(result.scalars().all())
 
         except Exception as e:
@@ -332,3 +330,23 @@ class PropertyRepository:
                 f"[PropertyRepository] Unexpected transactional crash: {str(e)}"
             )
             raise RepositoryException(f"Unexpected error occurred: {str(e)}")
+
+    async def get_hotel_detail_by_property_id(
+        self, property_id: uuid.UUID, hotel_id: uuid.UUID
+    ) -> PropertyHotelDetail | None:
+        logger.info(
+            f"[PropertyRepository] Fetching hotel detail for property {property_id} and hotel {hotel_id}"
+        )
+        try:
+            result = await self.db.execute(
+                select(PropertyHotelDetail).where(
+                    PropertyHotelDetail.property_id == property_id,
+                    PropertyHotelDetail.id == hotel_id,
+                )
+            )
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"[PropertyRepository] Error fetching hotel detail for property {property_id} and hotel {hotel_id}: {str(e)}"
+            )
+            raise RepositoryException(f"Error fetching hotel detail: {str(e)}")

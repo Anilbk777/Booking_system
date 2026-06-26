@@ -22,7 +22,6 @@ from sqlalchemy import (
     Enum as SqlEnum,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.associationproxy import AssociationProxy, association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.config.database_config import Base
@@ -119,6 +118,13 @@ class Property(Base, TimestampMixin):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    special_offers: Mapped[List["SpecialOffer"]] = relationship(
+        "SpecialOffer",
+        back_populates="property",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
 
 # ---------------------------------------------------------------------------
 # PropertyHotelDetail

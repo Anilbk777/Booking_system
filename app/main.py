@@ -1,20 +1,20 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from app.config.database_config import engine, Base
-from app.utils.exception_handlers import register_exception_handlers
 from fastapi.middleware.cors import CORSMiddleware
-from app.modules.auth.routers.guests_router import router as guest_router
-from app.modules.auth.routers.users_router import router as user_router
+from fastapi.staticfiles import StaticFiles
 
-from app.modules.pms.routers.tenants_routers import router as tenant_router
-from app.modules.pms.routers.properties_routers import router as property_router
+from app.config.database_config import Base, engine
 
-# from app.modules.pms.routers.room_routers import router as room_router
 # from app.modules.pms.routers.room_units_routers import router as room_unit_router
 from app.modules.auth.models import *
+from app.modules.auth.routers.guests_router import router as guest_router
+from app.modules.auth.routers.users_router import router as user_router
 from app.modules.pms.models import *
+from app.modules.pms.routers.properties_routers import router as property_router
+from app.modules.pms.routers.room_routers import router as room_router
+from app.modules.pms.routers.tenants_routers import router as tenant_router
+from app.utils.exception_handlers import register_exception_handlers
 
 
 @asynccontextmanager
@@ -38,7 +38,7 @@ app.include_router(guest_router)
 app.include_router(user_router)
 app.include_router(tenant_router)
 app.include_router(property_router)
-# app.include_router(room_router)
+app.include_router(room_router)
 # app.include_router(room_unit_router)
 
 app.add_middleware(

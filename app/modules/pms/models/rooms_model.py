@@ -69,7 +69,6 @@ class RoomType(Base, TimestampMixin):
     )
     room_type_name: Mapped[str] = mapped_column(String(100), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships
     hotel_detail: Mapped["PropertyHotelDetail"] = relationship(
@@ -111,8 +110,6 @@ class BedType(Base, TimestampMixin):
     )
     bed_name: Mapped[str] = mapped_column(String(100), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # sort_order so defaults appear before customs in dropdowns
-    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships
     hotel_detail: Mapped["PropertyHotelDetail"] = relationship(
@@ -140,7 +137,6 @@ class RoomPhoto(Base, TimestampMixin):
     )
     photo_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     is_cover: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     # Relationships
     room: Mapped["Rooms"] = relationship("Rooms", back_populates="room_photos")
