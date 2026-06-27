@@ -35,6 +35,7 @@ class PropertyType(StrEnum):
     APARTMENT = "APARTMENT"
     RESORT = "RESORT"
     GUESTHOUSE = "GUESTHOUSE"
+    RESTURANT = "RESTURANT"
     OTHER = "OTHER"
 
 

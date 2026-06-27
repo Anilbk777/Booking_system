@@ -11,7 +11,7 @@ from app.modules.pms.repositories.properties_repo import PropertyRepository
 from app.modules.pms.repositories.room_repo import RoomRepository
 from app.modules.pms.schemas.room_schemas import RoomsCreate
 from app.utils.exceptions import (
-    HotelNotFoundException,
+    # HotelNotFoundException,
     PropertyNotFoundException,
     RepositoryException,
     RoomNameAlreadyExistsException,
@@ -28,9 +28,7 @@ class RoomService:
         self.room_repo = room_repo
         self.property_repo = property_repo
 
-    async def _validate_property(
-        self, property_id: uuid.UUID, tenant_id: uuid.UUID, hotel_id: uuid.UUID
-    ):
+    async def _validate_property(self, property_id: uuid.UUID, tenant_id: uuid.UUID):
         property_obj = await self.property_repo.get_property_by_id(
             property_id, tenant_id
         )
@@ -40,26 +38,25 @@ class RoomService:
         if property_obj.tenant_id != tenant_id:
             raise UnauthorizedException("You do not own this property")
 
-        hotel_detail = await self.property_repo.get_hotel_detail_by_property_id(
-            property_id=property_id, hotel_id=hotel_id
-        )
-        if not hotel_detail or hotel_detail.property_id != property_id:
-            raise HotelNotFoundException("Hotel detail not found for this property")
+        # hotel_detail = await self.property_repo.get_hotel_detail_by_property_id(
+        #     property_id=property_id, hotel_id=hotel_id
+        # )
+        # if not hotel_detail or hotel_detail.property_id != property_id:
+        #     raise HotelNotFoundException("Hotel detail not found for this property")
 
-        return None
+        return property_obj
 
     async def create_rooms(
         self,
         property_id: uuid.UUID,
         tenant_id: uuid.UUID,
-        hotel_id: uuid.UUID,
         payload: RoomsCreate,
     ):
-        logger.info(
-            f"[RoomService] Creating rooms for property {property_id} and hotel {hotel_id}"
-        )
+        logger.info(f"[RoomService] Creating rooms for property {property_id}")
         try:
-            await self._validate_property(property_id, tenant_id, hotel_id)
+            property_obj = await self._validate_property(
+                property_id, tenant_id
+            )
 
             # from the models to prevent Pydantic models from converting into sub-dictionaries.
             rooms_data = []
@@ -70,12 +67,13 @@ class RoomService:
                 rooms_data.append(room_dict)
 
             # Delegate execution to the refactored loop method
-            return await self.room_repo.create_rooms(rooms_data, hotel_id)
+            return await self.room_repo.create_rooms(
+                rooms_data, hotel_id=property_obj.hotel_detail.id
+            )
 
         except (
             PropertyNotFoundException,
             UnauthorizedException,
-            HotelNotFoundException,
         ):
             logger.warning(
                 "[RoomService] Validation rules failed before transaction initialization."

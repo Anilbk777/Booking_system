@@ -1,10 +1,9 @@
 import uuid
-from typing import Any, Awaitable, Callable, TypeVar
 
 from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.modules.pms.models.properties_model import (
     Amenity,
@@ -16,108 +15,7 @@ from app.modules.pms.models.properties_model import (
 from app.utils.exceptions import DefaultAmenityNotExistsException, RepositoryException
 from app.utils.logging import LoggerFactory
 
-T = TypeVar("T")
-
 logger = LoggerFactory.get_logger(__name__)
-
-
-# class PropertyRepository:
-#     def __init__(self, db: AsyncSession):
-#         self.db = db
-
-#     async def create_property(self, property_data: dict) -> Property:
-#         logger.info(
-#             f"[PropertyRepository] Creating property: {property_data['name']} of tenant {property_data['tenant_id']}"
-#         )
-#         try:
-#             new_property = Property(**property_data)
-#             self.db.add(new_property)
-#             await self.db.commit()
-#             await self.db.refresh(new_property)
-#             logger.info("[PropertyRepository] Property created successfully")
-#             return new_property
-#         except IntegrityError as e:
-#             await self.db.rollback()
-#             logger.error(
-#                 "[PropertyRepository] Error creating property: Integrity constraint violated"
-#             )
-#             raise RepositoryException(f"Integrity constraint violated: {str(e)}")
-#         except SQLAlchemyError as e:
-#             await self.db.rollback()
-#             logger.error("[PropertyRepository] Error creating property: SQLA  ")
-#             raise RepositoryException(f"SQLAlchemy error: {str(e)}")
-#         except Exception as e:
-#             await self.db.rollback()
-#             logger.error(f"[PropertyRepository] Error creating property: {str(e)}")
-#             raise RepositoryException(str(e))
-
-
-#     async def update_property(
-#         self, property_id: uuid.UUID, tenant_id: uuid.UUID, property_data: dict
-#     ) -> Property | None:
-#         logger.info(f"[PropertyRepository] Updating property: {property_id}")
-#         try:
-#             query = (
-#                 update(Property)
-#                 .where(Property.id == property_id, Property.tenant_id == tenant_id)
-#                 .values(**property_data)
-#                 .returning(Property)
-#             )
-#             result = await self.db.execute(query)
-#             updated_property = result.scalars().first()
-#             await self.db.commit()
-#             return updated_property
-#         except Exception as e:
-#             await self.db.rollback()
-#             logger.error(f"[PropertyRepository] Error updating property: {str(e)}")
-#             raise RepositoryException(str(e))
-
-#     async def delete_property(
-#         self, property_id: uuid.UUID, tenant_id: uuid.UUID
-#     ) -> bool:
-#         logger.info(f"[PropertyRepository] Deleting property: {property_id}")
-#         try:
-#             query = delete(Property).where(
-#                 Property.id == property_id, Property.tenant_id == tenant_id
-#             )
-#             result = await self.db.execute(query)
-#             await self.db.commit()
-#             return result.rowcount > 0
-#         except Exception as e:
-#             await self.db.rollback()
-#             logger.error(f"[PropertyRepository] Error deleting property: {str(e)}")
-#             raise RepositoryException(str(e))
-
-#     async def add_images_to_property(
-#         self, property_id: uuid.UUID, photos: list[PropertyPhoto]
-#     ) -> list[PropertyPhoto]:
-#         logger.info(
-#             f"[PropertyRepository] Adding {len(photos)} images to property {property_id}"
-#         )
-#         if not photos:
-#             return []
-
-#         try:
-#             self.db.add_all(photos)
-#             await self.db.commit()
-
-#             for photo in photos:
-#                 await self.db.refresh(photo)
-
-#             return photos
-
-#         except SQLAlchemyError as e:
-#             await self.db.rollback()
-#             logger.error(f"[PropertyRepository] Database error adding images: {str(e)}")
-#             raise RepositoryException("Failed to save property images to the database.")
-#         except Exception as e:
-#             await self.db.rollback()
-#             logger.error(
-#                 f"[PropertyRepository] Unexpected error adding images: {str(e)}"
-#             )
-#             raise RepositoryException(
-#                 "An unexpected error occurred while saving images."
-#             )
 
 
 class PropertyRepository:
@@ -130,10 +28,12 @@ class PropertyRepository:
         logger.info(f"[PropertyRepository] Getting property by id: {property_id}")
         try:
             result = await self.db.execute(
-                select(Property).where(
+                select(Property)
+                .where(
                     Property.id == property_id,
                     Property.tenant_id == tenant_id,
                 )
+                .options(joinedload(Property.hotel_detail))
             )
             property = result.scalar_one_or_none()
             return property
@@ -350,3 +250,44 @@ class PropertyRepository:
                 f"[PropertyRepository] Error fetching hotel detail for property {property_id} and hotel {hotel_id}: {str(e)}"
             )
             raise RepositoryException(f"Error fetching hotel detail: {str(e)}")
+
+    async def get_all_properties(self, tenant_id: uuid.UUID):
+        logger.info(
+            f"[PropertyRepository] Fetching all properties for tenant: {tenant_id}"
+        )
+        try:
+            stmt = select(Property).where(Property.tenant_id == tenant_id)
+            result = await self.db.execute(stmt)
+            return result.scalars().all()
+        except Exception as e:
+            logger.error(
+                f"[PropertyRepository] Error fetching all properties for tenant: {tenant_id}: {str(e)}"
+            )
+            raise RepositoryException(f"Error fetching all properties: {str(e)}")
+
+    async def get_property_details_by_id(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID
+    ):
+        try:
+            result = await self.db.execute(
+                select(Property)
+                .where(
+                    Property.id == property_id,
+                    Property.tenant_id == tenant_id,
+                )
+                .options(joinedload(Property.hotel_detail))
+                .options(
+                    selectinload(Property.property_amenities).selectinload(
+                        PropertyAmenity.amenity
+                    )
+                )
+                .options(selectinload(Property.photos))
+                .options(selectinload(Property.owned_custom_amenities))
+            )
+            property = result.scalar_one_or_none()
+            return property
+        except Exception as e:
+            logger.error(
+                f"[PropertyRepository] Error fetching property details for property {property_id} and tenant {tenant_id}: {str(e)}"
+            )
+            raise RepositoryException(f"Error fetching property details: {str(e)}")

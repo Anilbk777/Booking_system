@@ -14,6 +14,7 @@ from app.modules.pms.models import *
 from app.modules.pms.routers.properties_routers import router as property_router
 from app.modules.pms.routers.room_routers import router as room_router
 from app.modules.pms.routers.tenants_routers import router as tenant_router
+from app.modules.pms.routers.offers_routers import router as offer_router
 from app.utils.exception_handlers import register_exception_handlers
 
 
@@ -39,7 +40,7 @@ app.include_router(user_router)
 app.include_router(tenant_router)
 app.include_router(property_router)
 app.include_router(room_router)
-# app.include_router(room_unit_router)
+app.include_router(offer_router)
 
 app.add_middleware(
     CORSMiddleware,

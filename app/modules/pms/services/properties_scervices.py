@@ -19,7 +19,7 @@ from app.utils.exceptions import (
     RepositoryException,
     ServiceException,
     UnauthorizedException,
-    DefaultAmenityNotExistsException,   
+    DefaultAmenityNotExistsException,
 )
 from app.utils.imgae_utils import process_property_image
 from app.utils.logging import LoggerFactory
@@ -59,15 +59,50 @@ class PropertyService:
                 property_data=payload_dict,
                 hotel_detail_data=hotel_detail_data,
                 amenities_input=amenities_input,
-                photo_urls=photo_urls_data
+                photo_urls=photo_urls_data,
             )
 
-        except (RepositoryException, DefaultAmenityNotExistsException) :
+        except (RepositoryException, DefaultAmenityNotExistsException):
             raise
 
         except Exception as e:
             logger.error(f"[PropertyService] Error creating property: {str(e)}")
             raise ServiceException(str(e))
+
+    async def get_all_properties(self, tenant_id: uuid.UUID):
+        logger.info(f"[PropertyService] Getting all properties for tenant: {tenant_id}")
+        try:
+            return await self.property_repository.get_all_properties(tenant_id)
+        except RepositoryException:
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error getting all properties: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def get_property_details_by_id(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID
+    ):
+        logger.info(f"[PropertyService] Getting property details by id: {property_id}")
+
+        existing_property = await self.property_repository.get_property_by_id(
+            property_id, tenant_id
+        )
+        if not existing_property:
+            logger.error(f"[PropertyService] Property with id {property_id} not found")
+            raise PropertyNotFoundException(f"Property with id {property_id} not found")
+
+        try:
+            return await self.property_repository.get_property_details_by_id(
+                property_id, tenant_id
+            )
+        except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(
+                f"[PropertyService] Error getting property details by id: {str(e)}"
+            )
+            raise ServiceException(str(e))
+
 
 #     async def get_property_by_id(
 #         self, property_id: uuid.UUID, tenant_id: uuid.UUID

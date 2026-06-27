@@ -7,6 +7,7 @@ from .properties_model import (
     PropertyHotelDetail,
 )
 from .rooms_model import RoomType, BedType, Rooms, RoomPhoto
+from .offers_model import SpecialOffer
 
 __all__ = [
     "Tenant",
@@ -19,4 +20,5 @@ __all__ = [
     "BedType",
     "Rooms",
     "RoomPhoto",
+    "SpecialOffer",
 ]

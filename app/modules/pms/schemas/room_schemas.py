@@ -1,3 +1,4 @@
+from pydantic import field_validator
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -84,7 +85,6 @@ class RoomsBase(BaseModel):
     base_rate: Decimal = Field(
         ...,
         description="Base rate for the room per night",
-        ge=0,
     )
     status: str = Field(
         "AVAILABLE",
@@ -112,6 +112,22 @@ class RoomsBase(BaseModel):
         default_factory=list,
         description="List of Amenity model UUID keys attached to this room",
     )
+
+    # it must be greater than 0 and between 1 to 100000 base rate only
+    @field_validator("base_rate", mode="before")
+    @classmethod
+    def validate_base_rate(cls, value: any) -> Decimal:
+        try:
+            value = Decimal(value)
+            if value <= 0 or value > 100000:
+                raise ValueError(
+                    "Base rate must be greater than 0 and between 1 to 100000"
+                )
+            return value
+        except ValueError:
+            raise
+        except Exception:
+            raise ValueError("Base rate must be a valid number")
 
 
 class RoomsCreate(BaseModel):

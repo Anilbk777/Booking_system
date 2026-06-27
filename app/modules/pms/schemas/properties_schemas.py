@@ -176,3 +176,12 @@ class PropertyResponse(PropertyBase, TimestampSchema):
     amenities: List[AmenityResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
+
+
+# return response with property details only
+class PropertyDetailResponse(PropertyBase, TimestampSchema):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)

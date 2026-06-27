@@ -28,6 +28,7 @@ class SpecialOfferBase(BaseModel):
     start_date: date = Field(..., description="Active starting date window")
     end_date: date = Field(..., description="Active termination date window")
     is_active: bool = Field(default=False)
+    is_custom: bool = Field(default=False)
 
     @model_validator(mode="after")
     def validate_offer_chronology(self) -> "SpecialOfferBase":
