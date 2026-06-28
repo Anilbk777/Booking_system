@@ -36,7 +36,7 @@ app = FastAPI(
 )
 register_exception_handlers(app)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(guest_router)
 app.include_router(user_router)
