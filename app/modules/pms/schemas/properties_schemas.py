@@ -130,6 +130,7 @@ class PropertyCreate(PropertyBase):
     amenities: List[AmenityBase] = Field(default_factory=list)
     photo_urls: List[str] = Field(default_factory=list)
 
+
     @field_validator("amenities")
     @classmethod
     def validate_amenities(cls, v: List[AmenityBase]) -> List[AmenityBase]:
@@ -185,3 +186,5 @@ class PropertyDetailResponse(PropertyBase, TimestampSchema):
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
+
+

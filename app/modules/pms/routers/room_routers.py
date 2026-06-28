@@ -10,22 +10,9 @@ from app.modules.pms.schemas.room_schemas import (
     RoomsCreate,
     RoomsResponse,
     RoomTypeBase,
+    RoomsDetailResponse,
 )
 
-# from app.modules.pms.schemas.room_schemas import (
-#     RoomTypeCreate,
-#     RoomTypeUpdate,
-#     RoomTypeResponse,
-#     RatePlanCreate,
-#     RatePlanUpdate,
-#     RatePlanResponse,
-#     DateOverrideCreate,
-#     DateOverrideUpdate,
-#     DateOverrideResponse,
-#     DiscountCodeCreate,
-#     DiscountCodeUpdate,
-#     DiscountCodeResponse,
-# )
 from app.modules.pms.services.room_services import RoomService
 from app.utils.schemas import StandardResponse
 
@@ -90,3 +77,24 @@ async def create_room(
     # 3. Return the entire multi-room data structure packed inside your standardized envelope format
     return {"success": True, "data": formatted_rooms}
 
+
+@router.get("/{property_id}/rooms", response_model=StandardResponse[
+        list[RoomsDetailResponse]
+    ],
+    status_code=status.HTTP_200_OK
+    )
+async def get_rooms(
+    property_id: uuid.UUID,
+    user: CurrentUser,
+    room_service: RoomService = Depends(get_room_service),
+    ):
+    if user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not authorized to get rooms. You should have a tenant.",
+        )
+    rooms = await room_service.get_all_rooms(property_id=property_id, tenant_id=user.tenant_id)
+    return {
+        "success":True,
+        "data": rooms
+    }

@@ -138,3 +138,29 @@ class RoomsResponse(BaseModel):
     id: uuid.UUID
     room: RoomsBase
     model_config = ConfigDict(from_attributes=True)
+
+
+class AmenityDetailResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    is_default: bool
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+
+class RoomsDetailResponse(BaseModel):
+    id: uuid.UUID
+    room_name: str 
+    floor_number: int 
+    max_adults: int 
+    max_children: int 
+    base_rate: Decimal
+    status: str
+    cancellation_policy: str
+    cancellation_notes: Optional[str]
+    room_type: RoomTypeBase
+    bed_type: BedTypeBase
+    photos: List[str]
+    amenities: List[AmenityDetailResponse]
+    model_config = ConfigDict(from_attributes=True)

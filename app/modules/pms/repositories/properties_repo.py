@@ -291,3 +291,161 @@ class PropertyRepository:
                 f"[PropertyRepository] Error fetching property details for property {property_id} and tenant {tenant_id}: {str(e)}"
             )
             raise RepositoryException(f"Error fetching property details: {str(e)}")
+
+        
+    async def update_property(
+        self,
+        property_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        property_data: dict,
+        hotel_detail_data: dict | None,
+        amenities_input: list | None,
+        photo_urls: list | None,
+    ) -> dict:
+        """
+        Updates a property graph atomically in an all-or-nothing style.
+        Returns the fully updated property, hotel detail, amenities list, and photo list.
+        """
+        logger.info(f"[PropertyRepository] Initiating full-graph update for property: {property_id}")
+        
+        try:
+            # 1. Fetch root property profile to secure tenant isolation boundaries
+            stmt = select(Property).where(
+                and_(Property.id == property_id, Property.tenant_id == tenant_id)
+            )
+            result = await self.db.execute(stmt)
+            existing_property = result.scalar_one_or_none()
+            
+            if not existing_property:
+                logger.error(f"[PropertyRepository] Property {property_id} not found or unauthorized.")
+                raise PropertyNotFoundException("Property not found or access denied.")
+
+            # 2. Overwrite core fields on the root Property model directly
+            for key, val in property_data.items():
+                setattr(existing_property, key, val)
+
+            # 3. Overwrite Hotel Details sub-record fields
+            active_detail = None
+            if hotel_detail_data is not None:
+                detail_stmt = select(PropertyHotelDetail).where(
+                    PropertyHotelDetail.property_id == property_id
+                )
+                detail_res = await self.db.execute(detail_stmt)
+                existing_detail = detail_res.scalar_one_or_none()
+                
+                if existing_detail:
+                    for key, val in hotel_detail_data.items():
+                        setattr(existing_detail, key, val)
+                    active_detail = existing_detail
+                else:
+                    # Fallback if no detail record exists yet
+                    active_detail = PropertyHotelDetail(property_id=property_id, **hotel_detail_data)
+                    self.db.add(active_detail)
+
+            # 4. Sync Amenities (Wipe old mapping links and rebuild from the frontend list)
+            updated_final_amenities = []
+            if amenities_input is not None:
+                await self.db.execute(
+                    delete(PropertyAmenity).where(PropertyAmenity.property_id == property_id)
+                )
+                
+                for amenity_in in amenities_input:
+                    if isinstance(amenity_in, dict):
+                        name_val = amenity_in.get("name", "")
+                        is_default_val = amenity_in.get("is_default", False)
+                    else:
+                        name_val = getattr(amenity_in, "name", "")
+                        is_default_val = getattr(amenity_in, "is_default", False)
+                        
+                    clean_name = name_val.strip() if name_val else ""
+                    if not clean_name:
+                        continue
+                    
+                    matched_amenity = None
+                    if is_default_val:
+                        # Look up global default amenity entries
+                        am_stmt = select(Amenity).where(
+                            and_(
+                                func.lower(Amenity.name) == clean_name.lower(),
+                                Amenity.is_default == True,
+                                Amenity.property_id.is_(None)
+                            )
+                        )
+                        am_res = await self.db.execute(am_stmt)
+                        matched_amenity = am_res.scalar_one_or_none()
+                        if not matched_amenity:
+                            logger.error(f"[PropertyRepository] Default amenity '{clean_name}' does not exist.")
+                            raise DefaultAmenityNotExistsException(
+                                f"The default amenity '{clean_name}' is not supported by the platform."
+                            )
+                    else:
+                        # Look up or create a custom amenity for this specific property
+                        am_stmt = select(Amenity).where(
+                            and_(
+                                func.lower(Amenity.name) == clean_name.lower(),
+                                Amenity.property_id == property_id
+                            )
+                        )
+                        am_res = await self.db.execute(am_stmt)
+                        matched_amenity = am_res.scalar_one_or_none()
+                        
+                        if not matched_amenity:
+                            matched_amenity = Amenity(
+                                name=clean_name, 
+                                is_default=False, 
+                                property_id=property_id
+                            )
+                            self.db.add(matched_amenity)
+                            await self.db.flush()  # Generates primary key ID immediately
+
+                    if matched_amenity:
+                        updated_final_amenities.append(matched_amenity)
+                        # Create the modern bridge mapping link
+                        new_link = PropertyAmenity(property_id=property_id, amenity_id=matched_amenity.id)
+                        self.db.add(new_link)
+
+            # 5. Sync Photos (Clear out old URLs and completely replace with accidental delete guard)
+            updated_photos = []
+            if photo_urls is not None:
+                clean_photo_urls = [url.strip() for url in photo_urls if url and url.strip()]
+                
+                # Safe Accidental Delete Guard
+                if not clean_photo_urls:
+                    logger.warning(f"[PropertyRepository] Update rejected for {property_id}: Photo list cannot be empty.")
+                    raise RepositoryException("A property must have at least one valid photo URL.")
+
+                await self.db.execute(
+                    delete(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
+                )
+                for url in clean_photo_urls:
+                    new_photo = PropertyPhoto(
+                        property_id=property_id, 
+                        photo_url=url
+                    )
+                    self.db.add(new_photo)
+                    updated_photos.append(new_photo)
+
+            # 6. Flush staged data to run database constraint logic checks before committing
+            await self.db.flush()
+            
+            # 7. Finalize database transaction permanently 
+            await self.db.commit()
+            logger.info(f"[PropertyRepository] Full graph transaction committed for property id: {property_id}")
+            
+            # 8. Refresh instance states to prevent lazy-load expiration bugs out of transaction scope
+            await self.db.refresh(existing_property)
+            if active_detail:
+                await self.db.refresh(active_detail)
+                
+            return {
+                "property": existing_property,
+                "hotel_detail": active_detail,
+                "amenities": updated_final_amenities,
+                "photo_urls": updated_photos,
+            }
+
+        except Exception as e:
+            # ALL-OR-NOTHING COUNTERMEASURE: Clear out every staged alteration state entry 
+            await self.db.rollback()
+            logger.critical(f"[PropertyRepository] Update transaction aborted. State rolled back. Error: {str(e)}")
+            raise

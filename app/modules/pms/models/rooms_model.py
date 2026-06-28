@@ -174,7 +174,7 @@ class RoomAmenity(Base, TimestampMixin):
 
     # Relationships
     room: Mapped["Rooms"] = relationship("Rooms", back_populates="room_amenities")
-
+    amenity: Mapped["Amenity"] = relationship("Amenity")
 
 # ---------------------------------------------------------------------------
 # Rooms
