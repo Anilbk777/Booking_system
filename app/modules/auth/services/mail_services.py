@@ -49,6 +49,18 @@ async def send_verification_email(to_email: str, verification_code: str) -> None
     Sends a verification email to the specified email address.
     """
     logger.info("[MailService] Sending verification email")
+    is_dev = os.getenv("ENVIRONMENT") == "development"
+    
+    if is_dev:
+        # Bypasses Resend entirely and outputs the credentials directly to your terminal
+        logger.info(f"\n"
+                    f"========================================================\n"
+                    f"[MailService][DEV MODE] Intercepted outbound email\n"
+                    f"TO: {to_email}\n"
+                    f"SUBJECT: StayEasy - Verify Your Email Address\n"
+                    f"DEVELOPMENT OTP CODE: {verification_code}\n"
+                    f"========================================================")
+        return
     try:
         html_content = f"""
         <html>
