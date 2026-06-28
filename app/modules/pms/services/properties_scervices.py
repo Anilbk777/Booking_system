@@ -21,7 +21,6 @@ from app.utils.exceptions import (
     UnauthorizedException,
     DefaultAmenityNotExistsException,
 )
-from app.utils.imgae_utils import process_property_image
 from app.utils.logging import LoggerFactory
 
 logger = LoggerFactory.get_logger(__name__)

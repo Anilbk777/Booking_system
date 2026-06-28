@@ -10,6 +10,7 @@ from app.modules.pms.repositories.room_repo import RoomRepository
 from app.modules.pms.repositories.offers_repo import SpecialOfferRepository
 from app.modules.pms.services.offers_services import SpecialOfferService
 
+from app.modules.pms.services.image_services import ImageService
 
 from app.config.database_config import get_db
 from fastapi import Depends
@@ -29,3 +30,7 @@ def get_room_service(db=Depends(get_db)) -> RoomService:
 
 def get_special_offer_service(db=Depends(get_db)) -> SpecialOfferService:
     return SpecialOfferService(special_offer_repo=SpecialOfferRepository(db=db))
+
+
+def get_image_service() -> ImageService:
+    return ImageService()

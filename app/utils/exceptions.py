@@ -168,13 +168,6 @@ class RoomTypeNotFoundException(AppBaseException):
         )
 
 
-class RatePlanNotFoundException(AppBaseException):
-    def __init__(self, internal_detail: str = None):
-        super().__init__(
-            user_message="Rate plan not found",
-            internal_detail=internal_detail,
-            status_code=404,
-        )
 
 
 class ResourceConflictException(AppBaseException):
@@ -231,5 +224,13 @@ class InvalidDateException(AppBaseException):
         super().__init__(
             user_message=user_message,
             internal_detail=user_message,
+            status_code=status_code,
+        )
+
+class ImageStorageException(AppBaseException):
+    def __init__(self, user_message: str, internal_detail: str = None, status_code: int = 500):
+        super().__init__(
+            user_message=user_message,
+            internal_detail=internal_detail,
             status_code=status_code,
         )

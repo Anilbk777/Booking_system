@@ -61,11 +61,10 @@ from io import BytesIO
 from PIL import Image, ImageOps, UnidentifiedImageError
 from .exceptions import InvalidImageException
 
-# Crucial: Prevent large image decompression attacks
 Image.MAX_IMAGE_PIXELS = 25_000_000  # Max ~25 Megapixels (approx. 5000x5000)
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB strict limit
 
-def process_property_image(content: bytes) -> bytes:
+def process_image(content: bytes) -> bytes:
     """
     Synchronous, CPU-bound image processing function.
     Resizes property photos and returns the optimized WEBP bytes.
