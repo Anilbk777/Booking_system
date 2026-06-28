@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class VerifyOTP(BaseModel):
     email: EmailStr
-    otp: str= Field(..., min_length=6, max_length=6)
+    otp: str= Field(..., min_length=6, max_length=6, title="OTP", description="OTP received via email")
 
 class ResendOTP(BaseModel):
     email: EmailStr

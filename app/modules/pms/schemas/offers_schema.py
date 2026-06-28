@@ -13,22 +13,25 @@ class TimestampSchema(BaseModel):
 class SpecialOfferBase(BaseModel):
     title: str = Field(
         ...,
+        title="Offer Title",
         description="Title name of the special offer deal",
         min_length=2,
         max_length=100,
         examples=["Early Bird 15%"],
     )
-    description: Optional[str] = Field(None, max_length=1000)
+    description: Optional[str] = Field(None, max_length=1000, title="Offer Description", description="Description of the special offer deal")
     discount_percentage: float = Field(
         float("0.00"),
-        description="Numerical discount deduction rate",
         ge=0.00,
         le=100.00,
+        title="Discount Percentage",
+        description="Discount percentage of the special offer deal",
+        examples=[15.00],
     )
-    start_date: date = Field(..., description="Active starting date window")
-    end_date: date = Field(..., description="Active termination date window")
-    is_active: bool = Field(default=False)
-    is_custom: bool = Field(default=False)
+    start_date: date = Field(..., title="Start Date", description="Active starting date window")
+    end_date: date = Field(..., title="End Date", description="Active termination date window")
+    is_active: bool = Field(default=False, title="Is Active", description="Is the special offer active")
+    is_custom: bool = Field(default=False, title="Is Custom", description="Is the special offer custom")
 
     @model_validator(mode="after")
     def validate_offer_chronology(self) -> "SpecialOfferBase":

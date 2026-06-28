@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException,  status
 
 from app.modules.auth.auth_middlewares import CurrentUser
 from app.modules.pms.dependencies import get_property_service
@@ -11,7 +11,7 @@ from app.modules.pms.schemas.properties_schemas import (
     PropertyPhotoResponse,
     PropertyResponse,
     PropertyDetailResponse,
- 
+    DefaultAmenityResponse,
 )
 from app.modules.pms.services.properties_scervices import PropertyService
 from app.utils.schemas import StandardResponse
@@ -109,6 +109,24 @@ async def get_all_properties(
 
 
 @router.get(
+    "/amenities",
+    response_model=StandardResponse[list[DefaultAmenityResponse]],
+    status_code=status.HTTP_200_OK,
+)
+async def get_all_amenities(
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not authorized to get a property.",
+        )
+    response = await property_service.get_all_amenities()
+    return {"success": True, "data": response}
+
+
+@router.get(
     "/{property_id}",
     response_model=StandardResponse[PropertyResponse],
     status_code=status.HTTP_200_OK,
@@ -167,7 +185,12 @@ async def get_property_by_id(
     )
     return {"success": True, "data": property_data}
 
-@router.patch("/{property_id}", response_model=StandardResponse[PropertyResponse], status_code=status.HTTP_200_OK,)
+
+@router.patch(
+    "/{property_id}",
+    response_model=StandardResponse[PropertyResponse],
+    status_code=status.HTTP_200_OK,
+)
 async def update_property(
     property_id: uuid.UUID,
     current_user: CurrentUser,
@@ -211,8 +234,12 @@ async def update_property(
         ],
     )
     return {"success": True, "data": property_data}
-    
-@router.post("/{property_id}/activation",status_code=status.HTTP_200_OK,)
+
+
+@router.post(
+    "/{property_id}/activation",
+    status_code=status.HTTP_200_OK,
+)
 async def update_property_activation(
     property_id: uuid.UUID,
     current_user: CurrentUser,
@@ -224,8 +251,25 @@ async def update_property_activation(
             detail="You are not authorized to update a property.",
         )
 
-    response = await property_service.update_property_activation(
+    await property_service.update_property_activation(
         property_id, current_user.tenant_id
     )
 
     return {"success": True, "data": "Property is activated"}
+
+
+@router.delete("/{property_id}", status_code=status.HTTP_200_OK)
+async def delete_property(
+    property_id: uuid.UUID,
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not authorized to delete a property.",
+        )
+
+    await property_service.delete_property(property_id, current_user.tenant_id)
+
+    return {"success": True, "data": "Property is deleted"}

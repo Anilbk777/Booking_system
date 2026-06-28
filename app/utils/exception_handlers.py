@@ -30,6 +30,35 @@ async def handle_app_exception(request: Request, exc: AppBaseException):
     )
 
 
+# @app.exception_handler(RequestValidationError)
+# async def handle_request_validation_error(
+#     request: Request, exc: RequestValidationError
+# ):
+#     logger.warning(
+#         "[RequestValidationError] path=%s | errors=%s",
+#         request.url.path,
+#         exc.errors(),
+#     )
+
+#     first_error = exc.errors()[0]
+
+#     # 1. Intercept malformed JSON syntax errors explicitly
+#     if first_error.get("type") == "json_invalid":
+#         return JSONResponse(
+#             status_code=400,
+#             content={"success": False, "error": "Invalid JSON payload format."},
+#         )
+
+#     # 2. Your existing formatting for standard field validation errors
+#     # field = " → ".join(str(loc) for loc in first_error["loc"][1:])
+#     message = first_error["msg"].replace("Value error, ", "")
+
+#     return JSONResponse(
+#         status_code=422,
+#         content={"success": False, "error": f"{message}"},
+#     )
+
+
 @app.exception_handler(RequestValidationError)
 async def handle_request_validation_error(
     request: Request, exc: RequestValidationError
@@ -49,13 +78,41 @@ async def handle_request_validation_error(
             content={"success": False, "error": "Invalid JSON payload format."},
         )
 
-    # 2. Your existing formatting for standard field validation errors
-    # field = " → ".join(str(loc) for loc in first_error["loc"][1:])
-    message = first_error["msg"].replace("Value error, ", "")
+    # 2. Extract field name from the location tuple and format it cleanly
+    # e.g., ('body', 'hotel_detail', 'total_rooms') -> "Total Rooms"
+    loc = first_error.get("loc", ())
+    if loc and len(loc) > 1:
+        # Get the last item (the actual field), replace underscores, and capitalize words
+        field_name = str(loc[-1]).replace("_", " ").title()
+    else:
+        field_name = "Input value"
+
+    # 3. Handle custom readable messages based on error types
+    error_type = first_error.get("type", "")
+    ctx = first_error.get("ctx", {})
+
+    if error_type == "greater_than_equal":
+        message = f"{field_name} should be greater than or equal to {ctx.get('ge')}"
+    elif error_type == "less_than_equal":
+        message = f"{field_name} should be less than or equal to {ctx.get('le')}"
+    elif error_type == "string_too_short":
+        message = (
+            f"{field_name} must be at least {ctx.get('min_length')} characters long"
+        )
+    elif error_type == "missing":
+        message = f"{field_name} is required"
+    else:
+        # Fallback for other standard errors
+        raw_msg = first_error["msg"].replace("Value error, ", "")
+        # Remove default generic prefix if it's there
+        if raw_msg.startswith("Input should be "):
+            message = f"{field_name} {raw_msg.replace('Input should be ', '')}"
+        else:
+            message = f"{field_name}: {raw_msg}"
 
     return JSONResponse(
         status_code=422,
-        content={"success": False, "error": f"{message}"},
+        content={"success": False, "error": message},
     )
 
 

@@ -1,19 +1,21 @@
 import uuid
 
-from fastapi import UploadFile
-from starlette.concurrency import run_in_threadpool
+# from fastapi import UploadFile
+# from starlette.concurrency import run_in_threadpool
 
-from app.modules.pms.models.properties_model import (
-    Amenity,
-    Property,
-    PropertyAmenity,
-    PropertyHotelDetail,
-    PropertyPhoto,
-)
+# from app.modules.pms.models.properties_model import (
+#     Amenity,
+#     Property,
+#     PropertyAmenity,
+#     PropertyHotelDetail,
+#     PropertyPhoto,
+# )
 from app.modules.pms.repositories.properties_repo import PropertyRepository
-from app.modules.pms.schemas.properties_schemas import PropertyCreate
+from app.modules.pms.schemas.properties_schemas import (
+    PropertyCreate,
+    DefaultAmenityResponse,
+)
 from app.utils.exceptions import (
-    InvalidImageException,
     PropertyAlreadyExistsException,
     PropertyNotFoundException,
     RepositoryException,
@@ -102,7 +104,9 @@ class PropertyService:
             )
             raise ServiceException(str(e))
 
-    async def update_property(self, property_id: uuid.UUID, tenant_id: uuid.UUID, payload: PropertyCreate):
+    async def update_property(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID, payload: PropertyCreate
+    ):
         logger.info(f"[PropertyService] Updating property: {property_id}")
 
         # 1. Convert Pydantic payload to clean dictionary mappings
@@ -124,13 +128,22 @@ class PropertyService:
             raise PropertyAlreadyExistsException(
                 f"Property with name {payload_dict['name']} already exists"
             )
-        
 
         try:
             return await self.property_repository.update_property(
-                property_id, tenant_id, payload_dict, hotel_detail_data, amenities_input, photo_urls_data
+                property_id,
+                tenant_id,
+                payload_dict,
+                hotel_detail_data,
+                amenities_input,
+                photo_urls_data,
             )
-        except (PropertyNotFoundException,PropertyAlreadyExistsException, UnauthorizedException, RepositoryException):
+        except (
+            PropertyNotFoundException,
+            PropertyAlreadyExistsException,
+            UnauthorizedException,
+            RepositoryException,
+        ):
             raise
         except Exception as e:
             logger.error(f"[PropertyService] Error updating property: {str(e)}")
@@ -150,12 +163,45 @@ class PropertyService:
                 property_id, tenant_id
             )
             if not value:
-                logger.error(f"[PropertyService] Error updating property activation")
+                logger.error("[PropertyService] Error updating property activation")
                 raise ServiceException("Error updating property activation")
             return value
-             
+
         except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
             raise
         except Exception as e:
-            logger.error(f"[PropertyService] Error updating property activation: {str(e)}")
+            logger.error(
+                f"[PropertyService] Error updating property activation: {str(e)}"
+            )
+            raise ServiceException(str(e))
+
+    async def delete_property(self, property_id: uuid.UUID, tenant_id: uuid.UUID):
+        logger.info(f"[PropertyService] Deleting property: {property_id}")
+
+        property_obj = await self.get_property_details_by_id(property_id, tenant_id)
+        if not property_obj:
+            logger.error(f"[PropertyService] Property with id {property_id} not found")
+            raise PropertyNotFoundException(f"Property with id {property_id} not found")
+        try:
+            return await self.property_repository.delete_property(
+                property_id, tenant_id
+            )
+        except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error deleting property: {str(e)}")
+            raise ServiceException(str(e))
+
+    async def get_all_amenities(self):
+        logger.info("[PropertyService] Getting all amenities")
+        try:
+            amenities = await self.property_repository.get_all_amenities()
+            return [
+                DefaultAmenityResponse.model_validate(amenity).model_dump(mode="json")
+                for amenity in amenities
+            ]
+        except RepositoryException:
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error getting all amenities: {str(e)}")
             raise ServiceException(str(e))

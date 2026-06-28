@@ -3,7 +3,6 @@ from datetime import datetime, time
 from decimal import Decimal
 from typing import Annotated, Any, List, Optional
 
-from PIL.DdsImagePlugin import item
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -79,9 +78,9 @@ class PropertyHotelDetailBase(BaseModel):
     check_in_time_to: Time12Hour
     check_out_time_from: Time12Hour
     check_out_time_to: Time12Hour
-    total_rooms: int = Field(default=0, ge=0)
-    year_built: Optional[int] = Field(None, ge=1800, le=2100)
-    number_of_floors: int = Field(default=1, ge=1)
+    total_rooms: int = Field(default=1, ge=1, title="Total Rooms", description="Total number of rooms")
+    year_built: Optional[int] = Field(None, ge=1800, le=2100, title="Year Built", description="Year when the property was built")
+    number_of_floors: int = Field(default=1, ge=1, title="Number of Floors", description="Number of floors in the property")
 
     @model_validator(mode="after")
     def validate_time_sequences(self) -> "PropertyHotelDetailBase":
@@ -101,7 +100,7 @@ class PropertyHotelDetailResponse(PropertyHotelDetailBase, TimestampSchema):
 
 
 class AmenityBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100)
+    name: str = Field(..., min_length=2, max_length=100, title="Amenity Name", description="Name of the amenity")
     is_default: bool = Field(default=False)
 
 
@@ -112,16 +111,16 @@ class AmenityResponse(AmenityBase, TimestampSchema):
 
 
 class PropertyBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=255)
+    name: str = Field(..., min_length=2, max_length=255, title="Property Name", description="Name of the property")
     type: PropertyType = Field(default=PropertyType.HOTEL)
-    description: Optional[str] = Field(None, max_length=2000)
-    country: str = Field(..., min_length=2, max_length=100)
-    state: str = Field(..., min_length=2, max_length=100)
-    city: str = Field(..., min_length=2, max_length=100)
-    zip_code: str = Field(..., min_length=2, max_length=10)
-    address: str = Field(..., min_length=2, max_length=255)
-    latitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6)
-    longitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6)
+    description: Optional[str] = Field(None, max_length=2000, title="Description", description="Description of the property")
+    country: str = Field(..., min_length=2, max_length=100, title="Country", description="Country of the property")
+    state: str = Field(..., min_length=2, max_length=100, title="State", description="State of the property")
+    city: str = Field(..., min_length=2, max_length=100, title="City", description="City of the property")
+    zip_code: str = Field(..., min_length=2, max_length=10, title="Zip Code", description="Zip code of the property")
+    address: str = Field(..., min_length=2, max_length=255, title="Address", description="Address of the property")
+    latitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6, title="Latitude", description="Latitude of the property")
+    longitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6, title="Longitude", description="Longitude of the property")
 
 
 class PropertyCreate(PropertyBase):
@@ -188,3 +187,11 @@ class PropertyDetailResponse(PropertyBase, TimestampSchema):
     model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
 
 
+
+class DefaultAmenityResponse(BaseModel):
+    id: uuid.UUID = Field(..., description="The unique identifier of the default amenity")
+    name: str = Field(..., description="The display name of the default amenity")
+    is_default: bool = Field(..., description="Flag indicating if this is a global system default")
+
+    # Enforce Pydantic V2 to safely parse from SQLAlchemy ORM models
+    model_config = ConfigDict(from_attributes=True)

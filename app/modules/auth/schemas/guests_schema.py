@@ -6,11 +6,11 @@ import uuid
 
 
 class GuestBase(BaseModel):
-    full_name: Annotated[str, Field(..., min_length=2, max_length=50)]
+    full_name: Annotated[str, Field(..., min_length=2, max_length=50, title="Full Name", description="Full name of the guest")]
     email: EmailStr
-    phone: Annotated[Optional[str], Field(default=None, min_length=10, max_length=15)]
+    phone: Annotated[Optional[str], Field(default=None, min_length=10, max_length=15, title="Phone", description="Phone number of the guest")]
     nationality: Annotated[
-        Optional[str], Field(default=None, min_length=2, max_length=50)
+        Optional[str], Field(default=None, min_length=2, max_length=50, title="Nationality", description="Nationality of the guest")
     ]
 
     @field_validator("phone")
@@ -48,7 +48,7 @@ class GuestBase(BaseModel):
 
 
 class GuestCreate(GuestBase):
-    password: Annotated[str, Field(..., min_length=8, max_length=255)]
+    password: Annotated[str, Field(..., min_length=8, max_length=255, title="Password", description="Password of the guest")]
 
     @field_validator("password")
     @classmethod

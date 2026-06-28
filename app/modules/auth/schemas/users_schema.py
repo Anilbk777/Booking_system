@@ -6,9 +6,9 @@ import uuid
 
 
 class UserBase(BaseModel):
-    full_name: Annotated[str, Field(..., min_length=2, max_length=50)]
+    full_name: Annotated[str, Field(..., min_length=2, max_length=50, title="Full Name", description="Full name of the user")]
     email: EmailStr
-    phone: Annotated[Optional[str], Field(default=None, min_length=10, max_length=15)]
+    phone: Annotated[Optional[str], Field(default=None, min_length=10, max_length=15, title="Phone", description="Phone number of the user")]
 
     @field_validator("phone")
     @classmethod
@@ -36,7 +36,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: Annotated[str, Field(..., min_length=8, max_length=255)]
+    password: Annotated[str, Field(..., min_length=8, max_length=255, title="Password", description="Password of the user")]
 
     @field_validator("password")
     @classmethod
