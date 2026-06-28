@@ -449,3 +449,25 @@ class PropertyRepository:
             await self.db.rollback()
             logger.critical(f"[PropertyRepository] Update transaction aborted. State rolled back. Error: {str(e)}")
             raise
+
+    async def update_property_activation(self, property_id: uuid.UUID, tenant_id: uuid.UUID):
+        try:
+            stmt = select(Property).where(
+                and_(Property.id == property_id, Property.tenant_id == tenant_id)
+            )
+            result = await self.db.execute(stmt)
+            existing_property = result.scalar_one_or_none()
+            if not existing_property:
+                logger.error(f"[PropertyRepository] Property {property_id} not found or unauthorized.")
+                raise PropertyNotFoundException("Property not found or access denied.")
+            existing_property.is_active = not existing_property.is_active
+            await self.db.commit()
+            logger.info(f"[PropertyRepository] Property {property_id} activation updated successfully")
+            return existing_property
+        except PropertyNotFoundException:
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[PropertyRepository] Error updating property {property_id}: {str(e)}")
+            raise RepositoryException(f"Error updating property: {str(e)}")
+    

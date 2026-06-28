@@ -212,3 +212,20 @@ async def update_property(
     )
     return {"success": True, "data": property_data}
     
+@router.post("/{property_id}/activation",status_code=status.HTTP_200_OK,)
+async def update_property_activation(
+    property_id: uuid.UUID,
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    if current_user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not authorized to update a property.",
+        )
+
+    response = await property_service.update_property_activation(
+        property_id, current_user.tenant_id
+    )
+
+    return {"success": True, "data": "Property is activated"}

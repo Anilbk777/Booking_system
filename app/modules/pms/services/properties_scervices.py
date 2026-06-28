@@ -135,3 +135,27 @@ class PropertyService:
         except Exception as e:
             logger.error(f"[PropertyService] Error updating property: {str(e)}")
             raise ServiceException(str(e))
+
+    async def update_property_activation(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID
+    ):
+        logger.info(f"[PropertyService] Updating property activation: {property_id}")
+
+        property_obj = await self.get_property_details_by_id(property_id, tenant_id)
+        if not property_obj:
+            logger.error(f"[PropertyService] Property with id {property_id} not found")
+            raise PropertyNotFoundException(f"Property with id {property_id} not found")
+        try:
+            value = await self.property_repository.update_property_activation(
+                property_id, tenant_id
+            )
+            if not value:
+                logger.error(f"[PropertyService] Error updating property activation")
+                raise ServiceException("Error updating property activation")
+            return value
+             
+        except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error updating property activation: {str(e)}")
+            raise ServiceException(str(e))
