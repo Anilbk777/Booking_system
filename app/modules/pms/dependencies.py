@@ -28,7 +28,9 @@ def get_room_service(db=Depends(get_db)) -> RoomService:
     return RoomService(RoomRepository(db=db), PropertyRepository(db=db))
 
 
-def get_special_offer_service(db=Depends(get_db)) -> SpecialOfferService:
+def get_special_offer_service(
+    db=Depends(get_db),
+) -> SpecialOfferService:
     return SpecialOfferService(special_offer_repo=SpecialOfferRepository(db=db))
 
 

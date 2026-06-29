@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.modules.pms.models.offers_model import SpecialOffer
-from app.utils.exceptions import InvalidDateException, RepositoryException
+from app.utils.exceptions import (
+    InvalidDateException,
+    RepositoryException,
+    OfferNotFoundException,
+    OfferNameAlreadyExistsException,
+)
 from app.utils.logging import LoggerFactory
 
 logger = LoggerFactory.get_logger(__name__)
@@ -98,27 +103,93 @@ class SpecialOfferRepository:
         except Exception as e:
             logger.error(f"[OfferRepository] Error getting all offers: {str(e)}")
             raise RepositoryException(f"Failed to get all offers: {str(e)}")
-            
-    # async def update_property_offers(self,property_id:uuid.UUID,offers_data:list[dict]):
-    #     try:
 
-    #         for offer_dict in offers_data:
-    #             offer=await self.db.get(SpecialOffer, offer_dict["id"])
-    #             if not offer:
-    #                 raise RepositoryException(f"Offer with id {offer_dict['id']} not found")
-    #             offer.title=offer_dict["title"]
-    #             offer.description=offer_dict["description"]
-    #             offer.discount_percentage=offer_dict["discount_percentage"]
-    #             offer.start_date=offer_dict["start_date"]
-    #             offer.end_date=offer_dict["end_date"]
-    #             offer.is_active=offer_dict["is_active"]
-    #             self.db.add(offer)
-    #         await self.db.commit()
-    #         return offers
-    #     except Exception as e:
-    #         await self.db.rollback()
-    #         logger.error(f"[OfferRepository] Error updating all offers: {str(e)}")
-    #         raise RepositoryException(f"Failed to update all offers: {str(e)}")
+    async def get_offer_by_id(self, offer_id: uuid.UUID, property_id: uuid.UUID):
+        logger.info(
+            f"[OfferRepository] Getting offer with id {offer_id} for property {property_id}"
+        )
+        try:
+            stmt = select(SpecialOffer).where(
+                SpecialOffer.id == offer_id, SpecialOffer.property_id == property_id
+            )
+            result = await self.db.execute(stmt)
+            offer = result.scalar_one_or_none()
+            return offer
+        except Exception as e:
+            logger.error(f"[OfferRepository] Error getting offer by id: {str(e)}")
+            raise RepositoryException(
+                "Failed to get offer", f"Failed to get offer by id: {str(e)}"
+            )
 
+    async def update_offer(
+        self, offer_id: uuid.UUID, property_id: uuid.UUID, offer_data: dict
+    ) -> SpecialOffer:
+        logger.info(f"[OfferRepository] Initiating graph update for offer: {offer_id}")
 
-    
+        try:
+            offer_obj = await self.get_offer_by_id(offer_id, property_id)
+
+            if not offer_obj:
+                logger.error(
+                    f"[OfferRepository] Offer {offer_id} not found under property context {property_id}."
+                )
+                raise OfferNotFoundException(
+                    "The requested special offer could not be found.",
+                    f"Offer with id {offer_id} not found for property {property_id}.",
+                )
+
+            for key in [
+                "title",
+                "description",
+                "discount_percentage",
+                "start_date",
+                "end_date",
+                "is_active",
+                "is_custom",
+            ]:
+                if key in offer_data:
+                    value = offer_data[key]
+                    if isinstance(value, str):
+                        value = value.strip()
+
+                    setattr(offer_obj, key, value)
+
+            await self.db.flush()
+            await self.db.commit()
+            logger.info(
+                f"[OfferRepository] Offer {offer_id} transaction fully committed."
+            )
+            await self.db.refresh(offer_obj)
+
+            return offer_obj
+
+        except OfferNotFoundException:
+            await self.db.rollback()
+            raise
+
+        except IntegrityError as e:
+            await self.db.rollback()
+            error_msg = str(e.orig) if hasattr(e, "orig") else str(e)
+            logger.error(
+                f"[OfferRepository] Unique constraint conflict detected during offer update: {error_msg}"
+            )
+
+            # Catch naming uniqueness collisions explicitly
+            if "uq_offers_property_title" in error_msg or "unique" in error_msg.lower():
+                raise OfferNameAlreadyExistsException(
+                    "An offer with this title already exists for your property footprint."
+                )
+            raise RepositoryException(
+                "Database consistency constraint violated.",
+                f"Failed to update offer constraints: {error_msg}",
+            )
+
+        except Exception as e:
+            await self.db.rollback()
+            logger.critical(
+                f"[OfferRepository] Unexpected update pipeline exception collapse: {str(e)}"
+            )
+            raise RepositoryException(
+                "Failed to complete offer data updates.",
+                f"Failed to update offer runtime states: {str(e)}",
+            )

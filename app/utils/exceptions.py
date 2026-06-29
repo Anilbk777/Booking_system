@@ -251,3 +251,17 @@ class ImageStorageException(AppBaseException):
             internal_detail=internal_detail,
             status_code=status_code,
         )
+
+
+class OfferNotFoundException(AppBaseException):
+    def __init__(self, user_message: str, internal_detail: str):
+        super().__init__(
+            user_message=user_message, internal_detail=internal_detail, status_code=404
+        )
+
+
+class OfferNameAlreadyExistsException(AppBaseException):
+    def __init__(self, user_message: str):
+        super().__init__(
+            user_message=user_message, internal_detail=user_message, status_code=409
+        )

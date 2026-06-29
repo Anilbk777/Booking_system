@@ -46,7 +46,6 @@ DEFAULT_ORIGINS = [
 env_origins = os.getenv("ALLOWED_ORIGINS", "")
 env_list = [o.strip() for o in env_origins.split(",") if o.strip()]
 ALLOWED_ORIGINS = list(dict.fromkeys(DEFAULT_ORIGINS + env_list))
-print(f"[CORS] Allowed origins: {ALLOWED_ORIGINS}")
 
 app = FastAPI(
     lifespan=lifespan, title="StayEasy API", version="1.0.0", root_path="/api/v1"

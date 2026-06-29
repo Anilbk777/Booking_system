@@ -67,6 +67,7 @@ class SpecialOffersCreate(BaseModel):
 
 
 
+
 class SpecialOfferResponse(TimestampSchema):
     id: uuid.UUID
     property_id: uuid.UUID
