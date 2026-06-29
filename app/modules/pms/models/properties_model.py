@@ -240,6 +240,7 @@ class Amenity(Base, TimestampMixin):
             "ix_amenities_unique_default_name",
             "name",
             unique=True,
+            sqlite_where=text("is_default = 1"),
             postgresql_where=text("is_default = true"),
         ),
         # A global default amenity must NOT belong to a specific property

@@ -308,6 +308,7 @@ class RoomRepository:
                 delete(RoomAmenity).where(RoomAmenity.room_id == room_id)
             )
             amenities_list = []
+            fetched_amenities = []
             if amenities_data:
                 # Look up all complete Amenity model objects in a single, fast batch query
                 am_stmt = select(Amenity).where(Amenity.id.in_(amenities_data))

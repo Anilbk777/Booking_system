@@ -13,6 +13,7 @@ from app.main import app
 from app.config.database_config import Base, get_db
 from app.config.redis_config import get_redis_client
 from app.modules.auth.models import *   # noqa: F401,F403  registers all ORM models
+from app.modules.pms.models import *    # noqa: F401,F403  registers all PMS ORM models
 
 import fakeredis.aioredis
 

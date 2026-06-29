@@ -45,7 +45,7 @@ def serialize_time_to_ampm_string(t: time) -> str:
 Time12Hour = Annotated[
     time,
     BeforeValidator(parse_ampm_string_to_time),
-    PlainSerializer(serialize_time_to_ampm_string, return_type=str, when_used="always"),
+    PlainSerializer(serialize_time_to_ampm_string, return_type=str, when_used="json"),
     WithJsonSchema(
         {
             "type": "string",

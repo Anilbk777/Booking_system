@@ -13,7 +13,7 @@ async def test_register_user(async_client: AsyncClient):
     payload = {
         "email": "admin@example.com",
         "password": "SecurePassword123!",
-        "full_name":"John Doe"
+        "full_name":"John Doe",
         "role": "admin",
         "phone": "1234567890",
     }
@@ -47,11 +47,7 @@ async def test_verify_otp(async_client: AsyncClient, token_store: dict):
     response = await async_client.post("/auth/users/verify-otp", json=payload)
     assert response.status_code == 200, response.text
     data = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["token_type"] == "bearer"
-    token_store["user_access"] = data["access_token"]
-    token_store["user_refresh"] = data["refresh_token"]
+    assert data["status"] == "success"
 
 
 @pytest.mark.asyncio

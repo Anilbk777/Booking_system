@@ -78,17 +78,15 @@ class OTPService:
     async def verify_otp(self, email: str, otp_code: str) -> bool:
         """
         Verifies the OTP.
-
         """
-         # 1. Check for development master bypass code
         is_dev = os.getenv("ENVIRONMENT") == "development"
         master_otp = os.getenv("DEVELOPMENT_MASTER_OTP", "123456")
-    
+
         if is_dev and otp_code == master_otp:
             logger.info(f"[OTPService][DEV MODE] Master OTP used successfully for {email}")
-        # Optionally delete the real OTP from Redis if it exists
-        await self.delete_otp(email)
-        return True
+            # Optionally delete the real OTP from Redis if it exists
+            await self.delete_otp(email)
+            return True
 
     # 2. Standard production validation logic
         try:
