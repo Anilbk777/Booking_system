@@ -24,28 +24,22 @@ async def bulk_create_special_offers(
     user: CurrentUser,
     offer_service: SpecialOfferService = Depends(get_special_offer_service),
 ):
-    # Enforce basic security access restrictions
     if user.tenant_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You are not authorized to create special offers. You must belong to a tenant.",
         )
 
-    # Execute transactional routine
     saved_models = await offer_service.create_property_offers(
         property_id=property_id, payload=payload
     )
 
-    # Map raw SQLAlchemy model entries to Pydantic Response schemas
     formatted_offers = [
         SpecialOfferResponse.model_validate(model_row) for model_row in saved_models
     ]
 
-    # Return everything packed neatly inside your standardized API envelope configuration
-    return {
-        "success": True,
-        "data": formatted_offers
-    }
+    return {"success": True, "data": formatted_offers}
+
 
 @router.get(
     "/{property_id}/special-offers",
@@ -57,26 +51,44 @@ async def get_property_special_offers(
     user: CurrentUser,
     offer_service: SpecialOfferService = Depends(get_special_offer_service),
 ):
-    # Enforce basic security access restrictions
     if user.tenant_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You are not authorized to get special offers. You must belong to a tenant.",
         )
 
-    # Execute transactional routine
-    saved_models = await offer_service.get_all_offers(
-        property_id=property_id
-    )
-    print(f"[OfferRouter] Fetched {len(saved_models)} offers for property: {property_id}")
+    saved_models = await offer_service.get_all_offers(property_id=property_id)
 
-    # Map raw SQLAlchemy model entries to Pydantic Response schemas
     formatted_offers = [
         SpecialOfferResponse.model_validate(model_row) for model_row in saved_models
     ]
 
-    # Return everything packed neatly inside your standardized API envelope configuration
-    return {
-        "success": True,
-        "data": formatted_offers
-    }
+    return {"success": True, "data": formatted_offers}
+
+
+# @router.patch(
+#     "/{property_id}/special-offers",
+#     response_model=StandardResponse[List[SpecialOfferResponse]],
+#     status_code=status.HTTP_200_OK,
+# )
+# async def update_property_special_offers(
+#     property_id: uuid.UUID,
+#     payload: SpecialOffersCreate,
+#     user: CurrentUser,
+#     offer_service: SpecialOfferService = Depends(get_special_offer_service),
+# ):
+#     if user.tenant_id is None:
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="You are not authorized to update special offers. You must belong to a tenant.",
+#         )
+
+#     saved_models = await offer_service.update_property_offers(
+#         property_id=property_id, payload=payload
+#     )
+
+#     formatted_offers = [
+#         SpecialOfferResponse.model_validate(model_row) for model_row in saved_models
+#     ]
+
+#     return {"success": True, "data": formatted_offers}

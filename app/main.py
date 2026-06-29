@@ -21,6 +21,8 @@ from app.modules.pms.routers.image_routers import router as image_router
 from app.utils.exception_handlers import register_exception_handlers
 
 load_dotenv()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
@@ -47,7 +49,7 @@ app.include_router(offer_router)
 app.include_router(image_router)
 
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS").split(",")
 
 
 app.add_middleware(

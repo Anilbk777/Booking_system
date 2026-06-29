@@ -35,11 +35,9 @@ class SpecialOffer(Base, TimestampMixin):
         nullable=False,
     )
 
-    # Basic Offer Content (Matches Title * and Description)
     title: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
 
-    # Financial Configuration (e.g., 10.00 for 10% OFF, 20.00 for 20% OFF, or 0.00 for Free items)
     discount_percentage: Mapped[float] = mapped_column(
         Numeric(precision=5, scale=2), nullable=False, default=0.00
     )
@@ -48,7 +46,7 @@ class SpecialOffer(Base, TimestampMixin):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
 
-    # UI Toggles (Matches checked/unchecked radio circles in your screenshot)
+    # UI Toggles (Matches checked/unchecked radio circles )
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_custom: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

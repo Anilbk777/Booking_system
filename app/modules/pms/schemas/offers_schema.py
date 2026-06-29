@@ -65,8 +65,16 @@ class SpecialOffersCreate(BaseModel):
         return self
 
 
-class SpecialOfferResponse(SpecialOfferBase, TimestampSchema):
+
+
+class SpecialOfferResponse(TimestampSchema):
     id: uuid.UUID
     property_id: uuid.UUID
+    title: str
+    description: Optional[str]
+    discount_percentage: float 
+    start_date: date
+    end_date: date
+    is_active: bool
     is_custom: bool
     model_config = ConfigDict(from_attributes=True)

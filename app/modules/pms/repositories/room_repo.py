@@ -2,7 +2,7 @@ import uuid
 
 from sqlalchemy import delete, func, select, and_
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.pms.models.properties_model import Amenity

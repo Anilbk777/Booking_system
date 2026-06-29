@@ -47,9 +47,36 @@ class SpecialOfferService:
         try:
             # Delegate handling directly to your atomic repository transaction method
             return await self.offer_repo.get_all_offers(property_id=property_id)
+
         except RepositoryException:
             # Pass known database errors straight up to the global handler
             raise
         except Exception as e:
             logger.error(f"[OfferService] Error fetching all offers: {str(e)}")
             raise ServiceException(f"Failed to fetch all offers: {str(e)}")
+
+
+    # async def update_property_offers(
+    #     self, property_id: uuid.UUID, payload: SpecialOffersCreate
+    # ):
+    #     logger.info(
+    #         f"[OfferService] Processing {len(payload.offers)} offers for property: {property_id}"
+    #     )
+
+    #     try:
+    #         # Convert Pydantic array to a flat list of dictionaries for the repository
+    #         offers_raw_list = [offer.model_dump() for offer in payload.offers]
+
+    #         # Delegate handling directly to your atomic repository transaction method
+    #         return await self.offer_repo.update_property_offers(
+    #             property_id=property_id, offers_data=offers_raw_list
+    #         )
+
+    #     except (RepositoryException, InvalidDateException):
+    #         # Pass known database errors straight up to the global handler
+    #         raise
+    #     except Exception as e:
+    #         logger.error(
+    #             f"[OfferService] Error orchestrating bulk offer update: {str(e)}"
+    #         )
+    #         raise ServiceException(f"Failed to update special offers: {str(e)}")

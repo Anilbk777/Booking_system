@@ -99,3 +99,26 @@ class SpecialOfferRepository:
             logger.error(f"[OfferRepository] Error getting all offers: {str(e)}")
             raise RepositoryException(f"Failed to get all offers: {str(e)}")
             
+    # async def update_property_offers(self,property_id:uuid.UUID,offers_data:list[dict]):
+    #     try:
+
+    #         for offer_dict in offers_data:
+    #             offer=await self.db.get(SpecialOffer, offer_dict["id"])
+    #             if not offer:
+    #                 raise RepositoryException(f"Offer with id {offer_dict['id']} not found")
+    #             offer.title=offer_dict["title"]
+    #             offer.description=offer_dict["description"]
+    #             offer.discount_percentage=offer_dict["discount_percentage"]
+    #             offer.start_date=offer_dict["start_date"]
+    #             offer.end_date=offer_dict["end_date"]
+    #             offer.is_active=offer_dict["is_active"]
+    #             self.db.add(offer)
+    #         await self.db.commit()
+    #         return offers
+    #     except Exception as e:
+    #         await self.db.rollback()
+    #         logger.error(f"[OfferRepository] Error updating all offers: {str(e)}")
+    #         raise RepositoryException(f"Failed to update all offers: {str(e)}")
+
+
+    
