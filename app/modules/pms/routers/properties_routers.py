@@ -120,7 +120,7 @@ async def get_all_amenities(
     if current_user.tenant_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You are not authorized to get a property.",
+            detail="You are not authorized to get a amenities.",
         )
     response = await property_service.get_all_amenities()
     return {"success": True, "data": response}

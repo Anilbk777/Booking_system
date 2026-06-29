@@ -148,6 +148,76 @@ class RoomsBase(BaseModel):
 class RoomsCreate(BaseModel):
     rooms: List[RoomsBase] = Field(..., min_length=1)
 
+class RoomsUpdate(BaseModel):
+    room_name: Optional[str] = Field(
+        ...,
+        title="Room Name",
+        description="Unique identifier or number for this specific room record",
+        examples=["101", "102", "Deluxe Suite A"],
+        min_length=1,
+        max_length=50,
+    )
+    floor_number: Optional[int] = Field(
+        ...,
+        title="Floor Number",
+        description="Floor number or identifier",
+        ge=0,
+        le=100,
+    )
+    max_adults: Optional[int] = Field(
+        ...,
+        title="Maximum Number of Adults",
+        description="Maximum number of adults allowed in the room",
+        ge=1,
+        le=30,
+    )
+    max_children: Optional[int] = Field(
+        ...,
+        title="Maximum Number of Children",
+        description="Maximum number of children allowed in the room",
+        ge=0,
+        le=15,
+    )
+    base_rate: Optional[Decimal] = Field(
+        ...,
+        title="Base Rate",
+        description="Base rate for the room per night",
+        ge=0,
+        le=100000,
+    )
+    status: Optional[RoomStatus] = Field(
+        RoomStatus.AVAILABLE,
+        title="Status",
+        description="Current status of the room (e.g. AVAILABLE, DIRTY, OCCUPIED)",
+        examples=["AVAILABLE", "DIRTY", "OCCUPIED"],
+    )
+    cancellation_policy: Optional[CancellationPolicy] = Field(
+        CancellationPolicy.FLEXIBLE,
+        title="Cancellation Policy",
+        description="Cancellation policy for the room (e.g. FLEXIBLE, STRICT)",
+        examples=["FLEXIBLE", "STRICT"],
+    )
+    cancellation_notes: Optional[str] = Field(
+        None,
+        title="Cancellation Notes",
+        description="Additional notes regarding the cancellation policy",
+        examples=["Cancellation is free up to 24 hours before check-in"],
+    )
+    room_type: Optional[RoomTypeBase] = Field(
+        ..., description="Room type characteristics associated with this room"
+    )
+    bed_type: Optional[BedTypeBase] = Field(
+        ..., description="Bed configuration profile associated with this room"
+    )
+    photos: Optional[List[str]] = Field(
+        default_factory=list,
+        description="List of raw photo string URLs associated with the room",
+    )
+    amenities: Optional[List[uuid.UUID]] = Field(
+        default_factory=list,
+        description="List of Amenity model UUID keys attached to this room",
+    )
+
 
 class RoomsResponse(BaseModel):
     id: uuid.UUID
@@ -179,3 +249,5 @@ class RoomsDetailResponse(BaseModel):
     photos: List[str]
     amenities: List[AmenityDetailResponse]
     model_config = ConfigDict(from_attributes=True)
+
+

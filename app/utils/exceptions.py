@@ -17,7 +17,7 @@ class RepositoryException(AppBaseException):
 
     def __init__(
         self,
-        user_message: str = "A data access error occurred. Please try again later.",
+        user_message: str = "A database error occurred. Please try again later.",
         internal_detail: str = None,
         status_code: int = 500,
     ):
@@ -168,8 +168,6 @@ class RoomTypeNotFoundException(AppBaseException):
         )
 
 
-
-
 class ResourceConflictException(AppBaseException):
     """Raised for duplicate entries or constraint violations."""
 
@@ -199,6 +197,13 @@ class DefaultAmenityNotExistsException(AppBaseException):
         )
 
 
+class AmenityNotFoundException(AppBaseException):
+    def __init__(self, user_message: str):
+        super().__init__(
+            user_message=user_message, internal_detail=user_message, status_code=404
+        )
+
+
 class HotelNotFoundException(AppBaseException):
     """Raised when a hotel with the given ID is not found."""
 
@@ -219,6 +224,15 @@ class RoomNameAlreadyExistsException(AppBaseException):
         )
 
 
+class RoomNotFoundException(AppBaseException):
+    def __init__(self, user_message="Room not found", internal_detail: str = None):
+        super().__init__(
+            user_message=user_message,
+            internal_detail=internal_detail,
+            status_code=404,
+        )
+
+
 class InvalidDateException(AppBaseException):
     def __init__(self, user_message, status_code=400):
         super().__init__(
@@ -227,8 +241,11 @@ class InvalidDateException(AppBaseException):
             status_code=status_code,
         )
 
+
 class ImageStorageException(AppBaseException):
-    def __init__(self, user_message: str, internal_detail: str = None, status_code: int = 500):
+    def __init__(
+        self, user_message: str, internal_detail: str = None, status_code: int = 500
+    ):
         super().__init__(
             user_message=user_message,
             internal_detail=internal_detail,

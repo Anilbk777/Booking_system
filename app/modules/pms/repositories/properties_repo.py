@@ -562,3 +562,23 @@ class PropertyRepository:
                 f"[PropertyRepository] Error fetching default amenities: {str(e)}"
             )
             raise RepositoryException(f"Error fetching default amenities: {str(e)}")
+
+    async def get_images_count_by_property_id(self, property_id: uuid.UUID):
+        logger.info(
+            f"[PropertyRepository] Fetching image count for property {property_id}"
+        )
+        try:
+            stmt = select(func.count(PropertyPhoto.id)).where(
+                PropertyPhoto.property_id == property_id
+            )
+            result = await self.db.execute(stmt)
+            count = result.scalar_one()
+            logger.info(
+                f"[PropertyRepository] Fetched {count} images for property {property_id}"
+            )
+            return count
+        except Exception as e:
+            logger.error(
+                f"[PropertyRepository] Error fetching image count for property {property_id}: {str(e)}"
+            )
+            raise RepositoryException(f"Error fetching image count for property: {str(e)}")

@@ -30,34 +30,6 @@ async def handle_app_exception(request: Request, exc: AppBaseException):
     )
 
 
-# @app.exception_handler(RequestValidationError)
-# async def handle_request_validation_error(
-#     request: Request, exc: RequestValidationError
-# ):
-#     logger.warning(
-#         "[RequestValidationError] path=%s | errors=%s",
-#         request.url.path,
-#         exc.errors(),
-#     )
-
-#     first_error = exc.errors()[0]
-
-#     # 1. Intercept malformed JSON syntax errors explicitly
-#     if first_error.get("type") == "json_invalid":
-#         return JSONResponse(
-#             status_code=400,
-#             content={"success": False, "error": "Invalid JSON payload format."},
-#         )
-
-#     # 2. Your existing formatting for standard field validation errors
-#     # field = " → ".join(str(loc) for loc in first_error["loc"][1:])
-#     message = first_error["msg"].replace("Value error, ", "")
-
-#     return JSONResponse(
-#         status_code=422,
-#         content={"success": False, "error": f"{message}"},
-#     )
-
 
 @app.exception_handler(RequestValidationError)
 async def handle_request_validation_error(

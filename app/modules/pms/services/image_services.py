@@ -3,6 +3,7 @@ from fastapi import UploadFile
 from app.utils.imgae_utils import process_image
 from app.modules.pms.storage.base_storage import StorageFactory
 from app.utils.exceptions import ServiceException, ImageStorageException, InvalidImageException
+from app.modules.pms.repositories.properties_repo import PropertyRepository
 from app.utils.logging import LoggerFactory
 
 logger = LoggerFactory.get_logger(__name__)
@@ -12,6 +13,7 @@ class ImageService:
         self.provider = StorageFactory.get_storage()
 
     async def upload_property_images(self, folder_name:str, files:list[UploadFile]) -> list[str]:
+
         try:
             tasks = [self._process_and_upload_single(folder_name=folder_name, file=file) for file in files]
             results = await asyncio.gather(*tasks, return_exceptions=True)
