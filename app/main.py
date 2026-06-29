@@ -49,8 +49,19 @@ app.include_router(offer_router)
 app.include_router(image_router)
 
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS").split(",")
+# Read allowed origins from environment variable, falling back to an empty string if not set
+env_origins = os.getenv("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
 
+# If no origins are set in the environment, use a default list for local development
+if not ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS = [
+        "http://localhost:8000",
+        "http://localhost:5173",
+        "http://localhost:5176",
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
