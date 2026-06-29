@@ -33,9 +33,34 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
+# ── CORS must be registered first so it wraps exception handlers too ──
+# In Starlette 1.x, exception handler responses bypass middleware unless
+# middleware is added before any exception handlers or routers.
+DEFAULT_ORIGINS = [
+    "http://localhost:8000",
+    "http://localhost:5173",
+    "http://localhost:5176",
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+]
+env_origins = os.getenv("ALLOWED_ORIGINS", "")
+env_list = [o.strip() for o in env_origins.split(",") if o.strip()]
+ALLOWED_ORIGINS = list(dict.fromkeys(DEFAULT_ORIGINS + env_list))
+print(f"[CORS] Allowed origins: {ALLOWED_ORIGINS}")
+
 app = FastAPI(
     lifespan=lifespan, title="StayEasy API", version="1.0.0", root_path="/api/v1"
 )
+
+# Add CORS middleware BEFORE exception handlers and routers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 register_exception_handlers(app)
 
 # app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -47,31 +72,6 @@ app.include_router(property_router)
 app.include_router(room_router)
 app.include_router(offer_router)
 app.include_router(image_router)
-
-
-# Base list always includes local dev origins
-DEFAULT_ORIGINS = [
-    "http://localhost:8000",
-    "http://localhost:5173",
-    "http://localhost:5176",
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-]
-
-# Merge any origins set via env var (e.g. production frontend URL) with the defaults
-env_origins = os.getenv("ALLOWED_ORIGINS", "")
-env_list = [o.strip() for o in env_origins.split(",") if o.strip()]
-ALLOWED_ORIGINS = list(dict.fromkeys(DEFAULT_ORIGINS + env_list))  # deduped, order preserved
-
-print(f"[CORS] Allowed origins: {ALLOWED_ORIGINS}")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.get("/")
