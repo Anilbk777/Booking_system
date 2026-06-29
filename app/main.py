@@ -49,19 +49,21 @@ app.include_router(offer_router)
 app.include_router(image_router)
 
 
-# Read allowed origins from environment variable, falling back to an empty string if not set
-env_origins = os.getenv("ALLOWED_ORIGINS", "")
-ALLOWED_ORIGINS = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+# Base list always includes local dev origins
+DEFAULT_ORIGINS = [
+    "http://localhost:8000",
+    "http://localhost:5173",
+    "http://localhost:5176",
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+]
 
-# If no origins are set in the environment, use a default list for local development
-if not ALLOWED_ORIGINS:
-    ALLOWED_ORIGINS = [
-        "http://localhost:8000",
-        "http://localhost:5173",
-        "http://localhost:5176",
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-    ]
+# Merge any origins set via env var (e.g. production frontend URL) with the defaults
+env_origins = os.getenv("ALLOWED_ORIGINS", "")
+env_list = [o.strip() for o in env_origins.split(",") if o.strip()]
+ALLOWED_ORIGINS = list(dict.fromkeys(DEFAULT_ORIGINS + env_list))  # deduped, order preserved
+
+print(f"[CORS] Allowed origins: {ALLOWED_ORIGINS}")
 
 app.add_middleware(
     CORSMiddleware,
