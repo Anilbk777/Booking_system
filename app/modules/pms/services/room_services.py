@@ -204,3 +204,36 @@ class RoomService:
         except Exception as e:
             logger.error(f"[RoomService] Error executing room updating: {str(e)}")
             raise ServiceException(str(e))
+
+    async def delete_room(
+        self, property_id: uuid.UUID, room_id: uuid.UUID, tenant_id: uuid.UUID
+    ):
+        logger.info(f"[RoomService] Deleting room {room_id} for property {property_id}")
+        try:
+            property_obj = await self._validate_property(property_id, tenant_id)
+            hotel_id = property_obj.hotel_detail.id
+
+            # 2. Call the repository to check existence and perform the delete transaction
+            deleted_room = await self.room_repo.delete_room(
+                room_id=room_id,
+                hotel_id=hotel_id,
+            )
+            logger.info(f"[RoomService] Room '{deleted_room.room_name}' deleted successfully.")
+            return {
+                "success":True,
+                "data": {"message": f"Room '{deleted_room.room_name}' deleted successfully."}
+            }
+        
+        except (
+            PropertyNotFoundException,
+            UnauthorizedException,
+            RoomNotFoundException,
+            RepositoryException,
+        ):
+            logger.warning(
+                "[RoomService] Validation rules failed before transaction initialization."
+            )
+            raise
+        except Exception as e:
+            logger.error(f"[RoomService] Error executing room deletion: {str(e)}")
+            raise ServiceException(str(e))

@@ -2,7 +2,7 @@ import uuid
 
 from sqlalchemy import delete, func, select, and_
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.pms.models.properties_model import Amenity
@@ -199,6 +199,19 @@ class RoomRepository:
                 internal_detail=f"Failed to fetch rooms: {str(e)}"
             )
 
+    async def get_room_by_id(self, room_id: uuid.UUID, hotel_id: uuid.UUID):
+        try:
+            stmt = select(Rooms).where(
+                and_(Rooms.id == room_id, Rooms.hotel_detail_id == hotel_id)
+            )
+            result = await self.db.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"[RoomRepository] Unexpected fetch collapse: {str(e)}")
+            raise RepositoryException(
+                internal_detail=f"Failed to fetch rooms: {str(e)}"
+            )
+
     async def update_room(
         self,
         room_id: uuid.UUID,
@@ -360,4 +373,39 @@ class RoomRepository:
             )
             raise RepositoryException(
                 "Failed to update room", f"Failed to update room: {str(e)}"
+            )
+
+        
+    async def delete_room(self, room_id: uuid.UUID, hotel_id: uuid.UUID) -> Rooms:
+        logger.info(f"[RoomRepository] Initiating atomic removal sequence for room ID: {room_id}")
+        try:
+            stmt = select(Rooms).where(
+                and_(Rooms.id == room_id, Rooms.hotel_detail_id == hotel_id)
+            )
+            result = await self.db.execute(stmt)
+            existing_room = result.scalar_one_or_none()
+            
+            if not existing_room:
+                logger.error(f"[RoomRepository] Room {room_id} not found under hotel context {hotel_id}.")
+                raise RoomNotFoundException(
+                    "Room record not found or access unauthorized.",
+                    f"Room {room_id} not found under hotel context {hotel_id}.",
+                )
+
+            delete_stmt = delete(Rooms).where(Rooms.id == room_id)
+            await self.db.execute(delete_stmt)
+            
+            await self.db.commit()
+            logger.info(f"[RoomRepository] Room graph purged successfully for ID: {room_id}")
+            
+            return existing_room
+
+        except RoomNotFoundException:
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[RoomRepository] Unexpected delete transaction collapse: {str(e)}")
+            raise RepositoryException(
+                "Failed to delete room", f"Failed to delete room: {str(e)}"
             )
