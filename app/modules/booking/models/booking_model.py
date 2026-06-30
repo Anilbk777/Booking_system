@@ -4,8 +4,9 @@ from datetime import date
 from decimal import Decimal
 from typing import List
 
-from sqlalchemy import ForeignKey, String, Integer, Numeric, Date, DateTime, CheckConstraint, Enum as SqlEnum
+from sqlalchemy import ForeignKey, String, Integer, Numeric, Date,  CheckConstraint, Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.utils.timestamp import TimestampMixin
 
 class MasterBookingStatus(StrEnum):
     PENDING = "PENDING"
@@ -36,7 +37,7 @@ class Booking(Base, TimestampMixin):
     # Assuming your user table is named "users"
     guest_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), 
-        ForeignKey("users.id", ondelete="PROTECT"), 
+        ForeignKey("guests.id", ondelete="PROTECT"), 
         index=True, 
         nullable=False
     )
@@ -94,13 +95,6 @@ class BookingRoom(Base, TimestampMixin):
         nullable=False
     )
     
-    # Historical architecture references
-    room_type_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("room_types.id", ondelete="RESTRICT"), nullable=False)
-    rate_plan_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("rate_plans.id", ondelete="RESTRICT"), nullable=False)
-    
-    nightly_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    nights: Mapped[int] = mapped_column(Integer, nullable=False)
-
     # Relationships
     booking: Mapped["Booking"] = relationship("Booking", back_populates="booking_rooms")
     room_unit: Mapped["Rooms"] = relationship("Rooms")
