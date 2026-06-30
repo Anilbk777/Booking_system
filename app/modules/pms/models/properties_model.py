@@ -27,6 +27,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.config.database_config import Base
 from app.modules.pms.models.tenants_model import Tenant
 
+from app.utils.timestamp import TimestampMixin
 
 class PropertyType(StrEnum):
     HOTEL = "HOTEL"
@@ -39,18 +40,6 @@ class PropertyType(StrEnum):
     OTHER = "OTHER"
 
 
-class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
-
-
-# ---------------------------------------------------------------------------
-# Property
-# ---------------------------------------------------------------------------
 
 
 class Property(Base, TimestampMixin):
@@ -127,11 +116,6 @@ class Property(Base, TimestampMixin):
     )
 
 
-# ---------------------------------------------------------------------------
-# PropertyHotelDetail
-# ---------------------------------------------------------------------------
-
-
 class PropertyHotelDetail(Base, TimestampMixin):
     __tablename__ = "property_hotel_details"
     __table_args__ = (
@@ -198,11 +182,6 @@ class PropertyHotelDetail(Base, TimestampMixin):
     )
 
 
-# ---------------------------------------------------------------------------
-# PropertyPhoto
-# ---------------------------------------------------------------------------
-
-
 class PropertyPhoto(Base, TimestampMixin):
     __tablename__ = "property_photos"
 
@@ -219,12 +198,6 @@ class PropertyPhoto(Base, TimestampMixin):
 
     # Relationships
     property: Mapped["Property"] = relationship("Property", back_populates="photos")
-
-
-# ---------------------------------------------------------------------------
-# Amenity  — global defaults (property_id IS NULL) + per-property custom amenities
-# ---------------------------------------------------------------------------
-
 
 class Amenity(Base, TimestampMixin):
     __tablename__ = "amenities"
@@ -276,11 +249,6 @@ class Amenity(Base, TimestampMixin):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-
-
-# ---------------------------------------------------------------------------
-# PropertyAmenity  — which amenities a property has selected
-# ---------------------------------------------------------------------------
 
 
 class PropertyAmenity(Base, TimestampMixin):

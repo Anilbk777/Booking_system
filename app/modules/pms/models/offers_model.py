@@ -15,8 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.config.database_config import Base
-
-from .properties_model import TimestampMixin
+from app.utils.timestamp import TimestampMixin
 
 
 class SpecialOffer(Base, TimestampMixin):

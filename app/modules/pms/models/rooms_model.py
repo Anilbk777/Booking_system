@@ -17,7 +17,8 @@ from sqlalchemy import (
 from app.config.database_config import Base
 from typing import Optional, List
 from enum import StrEnum
-from app.modules.pms.models.properties_model import PropertyHotelDetail, TimestampMixin
+from app.modules.pms.models.properties_model import PropertyHotelDetail
+from app.utils.timestamp import TimestampMixin
 
 
 class RoomStatus(StrEnum):
@@ -34,12 +35,6 @@ class CancellationPolicy(StrEnum):
     STRICT = "STRICT"
     NON_REFUNDABLE = "NON_REFUNDABLE"
     CUSTOM = "CUSTOM"
-
-
-# ---------------------------------------------------------------------------
-# RoomType
-# ---------------------------------------------------------------------------
-
 
 class RoomType(Base, TimestampMixin):
     __tablename__ = "room_types"
@@ -75,11 +70,6 @@ class RoomType(Base, TimestampMixin):
         "PropertyHotelDetail", back_populates="room_types"
     )
     rooms: Mapped[List["Rooms"]] = relationship("Rooms", back_populates="room_type")
-
-
-# ---------------------------------------------------------------------------
-# BedType
-# ---------------------------------------------------------------------------
 
 
 class BedType(Base, TimestampMixin):
@@ -118,11 +108,6 @@ class BedType(Base, TimestampMixin):
     rooms: Mapped[List["Rooms"]] = relationship("Rooms", back_populates="bed_type")
 
 
-# ---------------------------------------------------------------------------
-# RoomPhoto
-# ---------------------------------------------------------------------------
-
-
 class RoomPhoto(Base, TimestampMixin):
     __tablename__ = "room_photos"
 
@@ -141,10 +126,6 @@ class RoomPhoto(Base, TimestampMixin):
     # Relationships
     room: Mapped["Rooms"] = relationship("Rooms", back_populates="room_photos")
 
-
-# ---------------------------------------------------------------------------
-# RoomAmenity — proper join table replacing the ARRAY(String) field
-# ---------------------------------------------------------------------------
 
 
 class RoomAmenity(Base, TimestampMixin):
@@ -175,10 +156,6 @@ class RoomAmenity(Base, TimestampMixin):
     # Relationships
     room: Mapped["Rooms"] = relationship("Rooms", back_populates="room_amenities")
     amenity: Mapped["Amenity"] = relationship("Amenity")
-
-# ---------------------------------------------------------------------------
-# Rooms
-# ---------------------------------------------------------------------------
 
 
 class Rooms(Base, TimestampMixin):

@@ -5,7 +5,7 @@ from pydantic import (
     field_validator,
     model_validator,
     StringConstraints,
-    ValidationInfo,
+
 )
 from typing import Optional, Annotated
 import uuid
