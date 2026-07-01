@@ -80,11 +80,7 @@ class CloudinaryImageStorage(ImageStorageStrategy):
     async def rename_image(self, old_public_id: str, new_public_id: str) -> dict:
         try:
             def _rename():
-                # This is the actual Cloudinary SDK call.
-                # Cloudinary's SDK is synchronous (blocking) — it makes a
-                # real HTTP request under the hood — so it can't be awaited
-                # directly. That's why it's wrapped in a plain function
-                # and run in a thread below, instead of called inline.
+         
                 return cloudinary.uploader.rename(
                     old_public_id,       # e.g. "test/properties/9f3a.../wtjpjac0..."
                     new_public_id,       # e.g. "test/properties/a1b2.../wtjpjac0..."
@@ -93,9 +89,6 @@ class CloudinaryImageStorage(ImageStorageStrategy):
                     invalidate=True,     # purge any CDN-cached copy of the old URL
                 )
 
-            # asyncio.to_thread runs the blocking call on a background
-            # thread, so it doesn't freeze your FastAPI event loop while
-            # waiting for Cloudinary's response.
             response = await asyncio.to_thread(_rename)
 
             return {

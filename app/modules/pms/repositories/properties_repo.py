@@ -347,6 +347,8 @@ class PropertyRepository:
             for key, val in property_data.items():
                 setattr(existing_property, key, val)
 
+           
+
             # 3. Overwrite Hotel Details sub-record fields
             active_detail = None
             if hotel_detail_data is not None:
@@ -444,21 +446,50 @@ class PropertyRepository:
                     url.strip() for url in photo_urls if url and url.strip()
                 ]
 
-                # Safe Accidental Delete Guard
                 if not clean_photo_urls:
                     logger.warning(
                         f"[PropertyRepository] Update rejected for {property_id}: Photo list cannot be empty."
                     )
                     raise RepositoryException(
-                        "A property must have at least one valid photo URL."
+                        user_message="A property must have at least one valid photo.",
+                        internal_message="A property must have at least one valid photo url",
+                        status_code=400
                     )
 
-                await self.db.execute(
-                    delete(PropertyPhoto).where(
-                        PropertyPhoto.property_id == property_id
-                    )
-                )
+                real_property_id = str(property_id)
+                final_photo_urls: list[str] = []
+
                 for url in clean_photo_urls:
+                    old_public_id = self.image_service.extract_public_id_from_url(url)
+                    current_folder_id = self.image_service.extract_fake_property_id_from_public_id(
+                        old_public_id
+                    )
+
+                    if current_folder_id == real_property_id:
+                        # Already lives in the correct permanent folder — nothing to rename
+                        final_photo_urls.append(url)
+                        continue
+
+                    # Still under a fake id (uploaded fresh this edit session) — rename it
+                    new_public_id = old_public_id.replace(current_folder_id, real_property_id)
+                    try:
+                        renamed = await self.image_service.provider.rename_image(
+                            old_public_id, new_public_id
+                        )
+                        final_photo_urls.append(renamed["url"])
+                    except Exception as e:
+                        logger.error(
+                            f"[PropertyRepository] Failed to rename image {old_public_id}: {str(e)}"
+                        )
+                        raise ImageStorageException(
+                            "Failed to finalize property images",
+                            f"Failed to finalize property images: {str(e)}",
+                        )
+
+                await self.db.execute(
+                    delete(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
+                )
+                for url in final_photo_urls:
                     new_photo = PropertyPhoto(property_id=property_id, photo_url=url)
                     self.db.add(new_photo)
                     updated_photos.append(new_photo)

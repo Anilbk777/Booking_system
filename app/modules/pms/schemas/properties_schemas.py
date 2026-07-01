@@ -123,6 +123,8 @@ class PropertyBase(BaseModel):
     longitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6, title="Longitude", description="Longitude of the property")
 
 
+MAX_IMAGES_PER_PROPERTY = 20
+
 class PropertyCreate(PropertyBase):
     model_config = ConfigDict(str_strip_whitespace=True)
     hotel_detail: PropertyHotelDetailBase
@@ -165,6 +167,47 @@ class PropertyCreate(PropertyBase):
             )
 
         return unique_amenities
+
+    @field_validator("photo_urls")
+    @classmethod
+    def validate_photo_urls(cls, v: List[str]) -> List[str]:
+        """Validate photo urls and raise error on duplicates."""
+        if not v:
+            return []
+
+        seen = set()
+        unique_photo_urls = []
+        duplicates = []
+
+        if len(v) > MAX_IMAGES_PER_PROPERTY:
+            raise ValueError(
+                f"Exceeded maximum number of images allowed: {MAX_IMAGES_PER_PROPERTY}"
+            )
+
+        for photo_url in v:
+            # Strip whitespace
+            clean_photo_url = photo_url.strip()
+
+            # Skip empty strings
+            if not clean_photo_url:
+                continue
+
+            # Case-insensitive check
+            normalized = clean_photo_url.lower()
+
+            if normalized not in seen:
+                seen.add(normalized)
+                unique_photo_urls.append(photo_url)
+            else:
+                duplicates.append(photo_url)
+
+        if duplicates:
+            raise ValueError(
+                f"Duplicate photo urls found: {', '.join(set([a.photo_url for a in duplicates]))}. "
+                f"Please remove duplicates before submitting."
+            )
+
+        return unique_photo_urls
 
 
 class PropertyResponse(PropertyBase, TimestampSchema):
