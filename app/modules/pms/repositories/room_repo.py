@@ -403,7 +403,7 @@ class RoomRepository:
                 "room_amenities": amenities_list,
             }
 
-        except (RoomNotFoundException, RoomNameAlreadyExistsException):
+        except (RoomNotFoundException, RoomNameAlreadyExistsException, ImageStorageException):
             await self.db.rollback()
             raise
 
@@ -434,7 +434,7 @@ class RoomRepository:
                 f"[RoomRepository] Unexpected update transaction collapse: {str(e)}"
             )
             raise RepositoryException(
-                "Failed to update room", f"Failed to update room: {str(e)}"
+                "Unable to update room.Please try again later.", f"Failed to update room: {str(e)} "
             )
 
         

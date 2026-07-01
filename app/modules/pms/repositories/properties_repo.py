@@ -515,13 +515,21 @@ class PropertyRepository:
                 "photo_urls": updated_photos,
             }
 
+        except (PropertyNotFoundException,DefaultAmenityNotExistsException,ImageStorageException,RepositoryException):
+            await self.db.rollback()
+            raise
+
         except Exception as e:
             # ALL-OR-NOTHING COUNTERMEASURE: Clear out every staged alteration state entry
             await self.db.rollback()
             logger.critical(
                 f"[PropertyRepository] Update transaction aborted. State rolled back. Error: {str(e)}"
             )
-            raise
+            raise RepositoryException(
+                user_message="Unable to update property.Please try again later.",
+                internal_message=f"[PropertyRepository] Update transaction aborted. State rolled back. Error: {str(e)}",
+                status_code=500,
+            )
 
     async def update_property_activation(
         self, property_id: uuid.UUID, tenant_id: uuid.UUID
