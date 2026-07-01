@@ -107,7 +107,7 @@ class PropertyRepository:
             final_photo_urls: list[str] = []
             if photo_urls:
                 public_ids = [self.image_service.extract_public_id_from_url(url) for url in photo_urls]
-                fake_property_id = self.image_service.extract_fake_property_id_from_public_id(public_ids[0])
+                fake_property_id = self.image_service.extract_fake_id_from_public_id(public_ids[0], "properties")
                 for old_public_id in public_ids:
                     new_public_id = old_public_id.replace(fake_property_id, str(new_property.id))
                     try:
@@ -461,8 +461,8 @@ class PropertyRepository:
 
                 for url in clean_photo_urls:
                     old_public_id = self.image_service.extract_public_id_from_url(url)
-                    current_folder_id = self.image_service.extract_fake_property_id_from_public_id(
-                        old_public_id
+                    current_folder_id = self.image_service.extract_fake_id_from_public_id(
+                        old_public_id, "properties"
                     )
 
                     if current_folder_id == real_property_id:

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.pms.models.rooms_model import CancellationPolicy, RoomStatus
 
+MAX_IMAGE_PER_ROOM = 10
 
 class TimestampSchema(BaseModel):
     created_at: datetime
@@ -144,6 +145,46 @@ class RoomsBase(BaseModel):
         except Exception:
             raise ValueError("Base rate must be a valid number")
 
+    @field_validator("photos")
+    @classmethod
+    def validate_photo_urls(cls, v: List[str]) -> List[str]:
+        """Validate photo urls and raise error on duplicates."""
+        if not v:
+            return []
+
+        if len(v) > MAX_IMAGE_PER_ROOM:
+            raise ValueError(
+                f"Exceeded maximum number of images allowed: {MAX_IMAGE_PER_ROOM}"
+            )
+
+        seen = set()
+        unique_photo_urls = []
+        duplicates = []
+
+        for photo_url in v:
+            # Strip whitespace
+            clean_photo_url = photo_url.strip()
+
+            # Skip empty strings
+            if not clean_photo_url:
+                continue
+
+            # Case-insensitive check
+            normalized = clean_photo_url.lower()
+
+            if normalized not in seen:
+                seen.add(normalized)
+                unique_photo_urls.append(photo_url)
+            else:
+                duplicates.append(photo_url)
+
+        if duplicates:
+            raise ValueError(
+                f"Duplicate photo urls found: {', '.join(set([a.photo_url for a in duplicates]))}. "
+                f"Please remove duplicates before submitting."
+            )
+
+        return unique_photo_urls
 
 class RoomsCreate(BaseModel):
     rooms: List[RoomsBase] = Field(..., min_length=1)
@@ -217,6 +258,47 @@ class RoomsUpdate(BaseModel):
         default_factory=list,
         description="List of Amenity model UUID keys attached to this room",
     )
+
+    @field_validator("photos")
+    @classmethod
+    def validate_photo_urls(cls, v: List[str]) -> List[str]:
+        """Validate photo urls and raise error on duplicates."""
+        if not v:
+            return []
+
+        if len(v) > MAX_IMAGE_PER_ROOM:
+            raise ValueError(
+                f"Exceeded maximum number of images allowed: {MAX_IMAGE_PER_ROOM}"
+            )
+
+        seen = set()
+        unique_photo_urls = []
+        duplicates = []
+
+        for photo_url in v:
+            # Strip whitespace
+            clean_photo_url = photo_url.strip()
+
+            # Skip empty strings
+            if not clean_photo_url:
+                continue
+
+            # Case-insensitive check
+            normalized = clean_photo_url.lower()
+
+            if normalized not in seen:
+                seen.add(normalized)
+                unique_photo_urls.append(photo_url)
+            else:
+                duplicates.append(photo_url)
+
+        if duplicates:
+            raise ValueError(
+                f"Duplicate photo urls found: {', '.join(set([a.photo_url for a in duplicates]))}. "
+                f"Please remove duplicates before submitting."
+            )
+
+        return unique_photo_urls
 
 
 class RoomsResponse(BaseModel):

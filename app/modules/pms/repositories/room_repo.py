@@ -1,3 +1,4 @@
+from app.modules.pms.services.image_services import ImageService
 import uuid
 
 from sqlalchemy import delete, func, select, and_
@@ -18,6 +19,7 @@ from app.utils.exceptions import (
     RoomNameAlreadyExistsException,
     RoomNotFoundException,
     AmenityNotFoundException,
+    ImageStorageException,
 )
 from app.utils.logging import LoggerFactory
 
@@ -25,8 +27,9 @@ logger = LoggerFactory.get_logger(__name__)
 
 
 class RoomRepository:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, image_service:ImageService):
         self.db = db
+        self.image_service = image_service
 
     async def create_rooms(
         self, room_data: list[dict], hotel_id: uuid.UUID
@@ -102,9 +105,34 @@ class RoomRepository:
                 self.db.add(new_room)
                 await self.db.flush()  # Generate new_room.id
 
+                final_photo_urls: list[str] = []
+                if photos_data:
+                    real_room_id = str(new_room.id)
+                    public_ids = [
+                        self.image_service.extract_public_id_from_url(url)
+                        for url in photos_data
+                    ]
+                    fake_room_id = self.image_service.extract_fake_id_from_public_id(
+                        public_ids[0], "rooms"
+                    )
+
+                    for old_public_id in public_ids:
+                        new_public_id = old_public_id.replace(fake_room_id, real_room_id)
+                        try:
+                            renamed = await self.image_service.provider.rename_image(
+                                old_public_id, new_public_id
+                            )
+                            final_photo_urls.append(renamed["url"])
+                        except Exception as e:
+                            logger.error(
+                                f"[RoomRepository] Failed to rename image {old_public_id}: {str(e)}"
+                            )
+                            raise ImageStorageException(
+                                "Failed to finalize room images", str(e)
+                            )
                 # --- PROCESS PHOTOS ---
                 photos_list = []
-                for photo in photos_data:
+                for photo in final_photo_urls:
                     if photo.strip():
                         new_photo = RoomPhoto(
                             room_id=new_room.id, photo_url=photo.strip()
@@ -135,6 +163,10 @@ class RoomRepository:
             # Commit everything as a single atomic unit
             await self.db.commit()
             return saved_batch_results
+
+        except ImageStorageException:
+            raise
+
 
         except IntegrityError as e:
             await self.db.rollback()
@@ -297,11 +329,40 @@ class RoomRepository:
             # 5. --- SYNC ROOM PHOTOS ---
             await self.db.execute(delete(RoomPhoto).where(RoomPhoto.room_id == room_id))
             photos_list = []
-            for photo in photos_data:
-                if photo and photo.strip():
-                    new_photo = RoomPhoto(room_id=room_id, photo_url=photo.strip())
-                    self.db.add(new_photo)
-                    photos_list.append(new_photo)
+            real_room_id = str(room_id)
+            final_photo_urls: list[str] = []
+            if photos_data:
+                for url in photos_data: 
+                    old_public_id = self.image_service.extract_public_id_from_url(url)
+                    current_folder_id = self.image_service.extract_fake_id_from_public_id(
+                        old_public_id, "rooms"
+                    )
+
+                    if current_folder_id == real_room_id:
+                        # Already lives in the correct permanent folder — nothing to rename
+                        final_photo_urls.append(url)
+                        continue
+
+                    # Still under a fake id (uploaded fresh this edit session) — rename it
+                    new_public_id = old_public_id.replace(current_folder_id, real_room_id)
+                    try:
+                        renamed = await self.image_service.provider.rename_image(
+                            old_public_id, new_public_id
+                        )
+                        final_photo_urls.append(renamed["url"])
+                    except Exception as e:
+                        logger.error(
+                            f"[PropertyRepository] Failed to rename image {old_public_id}: {str(e)}"
+                        )
+                        raise ImageStorageException(
+                            "Failed to finalize property images",
+                            f"Failed to finalize property images: {str(e)}",
+                        )
+                for photo in final_photo_urls:
+                    if photo and photo.strip():
+                        new_photo = RoomPhoto(room_id=room_id, photo_url=photo.strip())
+                        self.db.add(new_photo)
+                        photos_list.append(new_photo)
 
             # 6. --- SYNC ROOM AMENITIES ---
             await self.db.execute(

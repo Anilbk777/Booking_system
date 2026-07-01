@@ -16,6 +16,7 @@ from pydantic import (
 
 from app.modules.pms.models.properties_model import PropertyType
 
+MAX_IMAGES_PER_PROPERTY = 20
 
 # ---------------------------------------------------------
 # Custom AM/PM Time Parser & Serializer Using Annotated
@@ -123,7 +124,6 @@ class PropertyBase(BaseModel):
     longitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6, title="Longitude", description="Longitude of the property")
 
 
-MAX_IMAGES_PER_PROPERTY = 20
 
 class PropertyCreate(PropertyBase):
     model_config = ConfigDict(str_strip_whitespace=True)

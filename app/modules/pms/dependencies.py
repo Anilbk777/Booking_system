@@ -28,7 +28,7 @@ def get_property_service(db=Depends(get_db)) -> PropertyService:
 
 
 def get_room_service(db=Depends(get_db)) -> RoomService:
-    return RoomService(RoomRepository(db=db), PropertyRepository(db=db, image_service=get_image_service()))
+    return RoomService(RoomRepository(db=db,image_service=get_image_service()), PropertyRepository(db=db, image_service=get_image_service()))
 
 
 def get_special_offer_service(

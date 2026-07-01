@@ -53,29 +53,54 @@ class ImageService:
         finally:
             await file.close()
 
-    def extract_fake_property_id_from_public_id(self, public_id: str) -> str:
+    def extract_fake_id_from_public_id(self, public_id: str, segment: str) -> str:
         """
         public_id looks like:
             "test/properties/9f3a1c2e-8b21-4a11-9c3d-1719999999/wtjpjac0dcyqv3epr5l6"
 
-        We want the folder segment right after "properties":
+        We want the folder segment right after "{segment}":
             "9f3a1c2e-8b21-4a11-9c3d-1719999999"
         """
         parts = public_id.split("/")
 
         try:
-            idx = parts.index("properties")
+            idx = parts.index(segment)
         except ValueError:
             raise ValueError(
-                f"'properties' segment not found in public_id: {public_id}"
+                f"'{segment}' segment not found in public_id: {public_id}"
             )
 
         if idx + 1 >= len(parts):
             raise ValueError(
-                f"No folder segment after 'properties' in public_id: {public_id}"
+                f"No folder segment after '{segment}' in public_id: {public_id}"
             )
 
         return parts[idx + 1]
+
+    # def extract_fake_property_id_from_public_id(self, public_id: str) -> str:
+    #     """
+    #     public_id looks like:
+    #         "test/properties/9f3a1c2e-8b21-4a11-9c3d-1719999999/wtjpjac0dcyqv3epr5l6"
+
+    #     We want the folder segment right after "properties":
+    #         "9f3a1c2e-8b21-4a11-9c3d-1719999999"
+    #     """
+    #     parts = public_id.split("/")
+
+    #     try:
+    #         idx = parts.index("rooms")
+    #     except ValueError:
+    #         raise ValueError(
+    #             f"'rooms' segment not found in public_id: {public_id}"
+    #         )
+
+    #     if idx + 1 >= len(parts):
+    #         raise ValueError(
+    #             f"No folder segment after 'rooms' in public_id: {public_id}"
+    #         )
+
+    #     return parts[idx + 1]
+
 
 
     def extract_public_id_from_url(self, url: str) -> str:
@@ -93,7 +118,7 @@ class ImageService:
 
 
     def extract_fake_property_id_from_url(self,url: str) -> str:
-        return extract_fake_property_id_from_public_id(extract_public_id_from_url(url))
+        return self.extract_fake_property_id_from_public_id(self.extract_public_id_from_url(url))
 
     
 
