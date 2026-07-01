@@ -1,3 +1,4 @@
+from app.modules.pms.services.image_services import ImageService
 import uuid
 
 from sqlalchemy import and_, delete, func, select
@@ -16,6 +17,7 @@ from app.utils.exceptions import (
     DefaultAmenityNotExistsException,
     RepositoryException,
     PropertyNotFoundException,
+    ImageStorageException,
 )
 from app.utils.logging import LoggerFactory
 
@@ -23,8 +25,9 @@ logger = LoggerFactory.get_logger(__name__)
 
 
 class PropertyRepository:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, image_service:ImageService):
         self.db = db
+        self.image_service = image_service
 
     async def get_property_by_id(
         self, property_id: uuid.UUID, tenant_id: uuid.UUID
@@ -100,7 +103,20 @@ class PropertyRepository:
 
             # 2. Flush to force PostgreSQL to safely generate new_property.id
             await self.db.flush()
-
+     
+            final_photo_urls: list[str] = []
+            if photo_urls:
+                public_ids = [self.image_service.extract_public_id_from_url(url) for url in photo_urls]
+                fake_property_id = self.image_service.extract_fake_property_id_from_public_id(public_ids[0])
+                for old_public_id in public_ids:
+                    new_public_id = old_public_id.replace(fake_property_id, str(new_property.id))
+                    try:
+                        renamed = await self.image_service.provider.rename_image(old_public_id, new_public_id)
+                        final_photo_urls.append(renamed["url"])
+                    except Exception as e:
+                        logger.error(f"[PropertyRepository] Failed to rename image {old_public_id}: {str(e)}")
+                        raise ImageStorageException("Failed to finalize property images", f"Failed to finalize property images{str(e)}")
+                        
             # 3. Instantiate and stage the Hotel Details configuration
             hotel_detail = PropertyHotelDetail(
                 property_id=new_property.id,
@@ -180,7 +196,7 @@ class PropertyRepository:
 
             # 5. Process and stage Property Photos
             final_photos: list[PropertyPhoto] = []
-            for url in photo_urls:
+            for url in final_photo_urls:
                 if isinstance(url, str) and url.strip():
                     new_photo = PropertyPhoto(
                         property_id=new_property.id,

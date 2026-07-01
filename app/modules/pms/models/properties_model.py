@@ -41,7 +41,6 @@ class PropertyType(StrEnum):
 
 
 
-
 class Property(Base, TimestampMixin):
     __tablename__ = "properties"
     __table_args__ = (

@@ -32,6 +32,7 @@ class PropertyService:
     def __init__(self, property_repository: PropertyRepository):
         self.property_repository = property_repository
 
+
     async def create_property(self, payload: PropertyCreate, tenant_id: uuid.UUID):
         logger.info(f"[PropertyService] Creating property: {payload}")
         # 1. Convert Pydantic payload to clean dictionary mappings

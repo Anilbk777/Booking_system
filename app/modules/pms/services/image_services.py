@@ -3,8 +3,8 @@ from fastapi import UploadFile
 from app.utils.imgae_utils import process_image
 from app.modules.pms.storage.base_storage import StorageFactory
 from app.utils.exceptions import ServiceException, ImageStorageException, InvalidImageException
-from app.modules.pms.repositories.properties_repo import PropertyRepository
 from app.utils.logging import LoggerFactory
+import re
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -36,7 +36,7 @@ class ImageService:
         try:
             raw_bytes = await file.read()
 
-            optimized_webp_bytes = await asyncio._to_thread(process_image, raw_bytes)
+            optimized_webp_bytes = await asyncio.to_thread(process_image, raw_bytes)
 
             saved_url = await self.provider.save_image(
                 folder_name=folder_name,
@@ -52,4 +52,49 @@ class ImageService:
             raise ServiceException(f"Error processing or uploading image: {str(e)}")
         finally:
             await file.close()
+
+    def extract_fake_property_id_from_public_id(self, public_id: str) -> str:
+        """
+        public_id looks like:
+            "test/properties/9f3a1c2e-8b21-4a11-9c3d-1719999999/wtjpjac0dcyqv3epr5l6"
+
+        We want the folder segment right after "properties":
+            "9f3a1c2e-8b21-4a11-9c3d-1719999999"
+        """
+        parts = public_id.split("/")
+
+        try:
+            idx = parts.index("properties")
+        except ValueError:
+            raise ValueError(
+                f"'properties' segment not found in public_id: {public_id}"
+            )
+
+        if idx + 1 >= len(parts):
+            raise ValueError(
+                f"No folder segment after 'properties' in public_id: {public_id}"
+            )
+
+        return parts[idx + 1]
+
+
+    def extract_public_id_from_url(self, url: str) -> str:
+        # https://res.cloudinary.com/<cloud>/image/upload/v1782893339/test/properties/.../file.webp
+        after_upload = url.split("/upload/", 1)[1]
+        # after_upload = "v1782893339/test/properties/.../wtjpjac0dcyqv3epr5l6.webp"
+
+        # strip the leading version segment (v followed by digits)
+        segments = after_upload.split("/", 1)
+        if segments[0].startswith("v") and segments[0][1:].isdigit():
+            after_upload = segments[1]
+
+        # strip the file extension
+        return re.sub(r"\.[^/.]+$", "", after_upload)
+
+
+    def extract_fake_property_id_from_url(self,url: str) -> str:
+        return extract_fake_property_id_from_public_id(extract_public_id_from_url(url))
+
+    
+
             

@@ -16,16 +16,19 @@ from app.config.database_config import get_db
 from fastapi import Depends
 
 
+def get_image_service() -> ImageService:
+    return ImageService()
+
 def get_tenant_service(db=Depends(get_db)) -> TenantService:
     return TenantService(tenant_repo=TenantRepository(db=db))
 
 
 def get_property_service(db=Depends(get_db)) -> PropertyService:
-    return PropertyService(property_repository=PropertyRepository(db=db))
+    return PropertyService(property_repository=PropertyRepository(db=db, image_service=get_image_service()))
 
 
 def get_room_service(db=Depends(get_db)) -> RoomService:
-    return RoomService(RoomRepository(db=db), PropertyRepository(db=db))
+    return RoomService(RoomRepository(db=db), PropertyRepository(db=db, image_service=get_image_service()))
 
 
 def get_special_offer_service(
@@ -34,5 +37,3 @@ def get_special_offer_service(
     return SpecialOfferService(special_offer_repo=SpecialOfferRepository(db=db))
 
 
-def get_image_service() -> ImageService:
-    return ImageService()

@@ -5,7 +5,7 @@ from app.modules.pms.services.image_services import ImageService
 from app.modules.pms.dependencies import get_image_service
 from app.utils.schemas import StandardResponse
 from app.utils.logging import LoggerFactory
-
+import uuid
 logger = LoggerFactory.get_logger(__name__)
 
 router = APIRouter(prefix="/pms", tags=["Image"])
@@ -47,3 +47,26 @@ async def upload_images(
     }
 
 
+
+@router.post("/property/image")
+async def upload_image_property(user:CurrentUser, image:UploadFile = File(...), image_service:ImageService = Depends(get_image_service),):
+    if user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not authorized to upload images. You must belong to an active tenant.",
+        )
+
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"File '{image.filename}' is invalid. Only valid image media files are accepted.",
+        )
+
+    fake_property_id = str(uuid.uuid4())
+     
+    uploaded_image_url = await image_service._process_and_upload_single(folder_name=f"{user.tenant_id}/properties/{fake_property_id}", file=image)
+
+    return {
+        "success":True,
+        "data":uploaded_image_url
+    }
