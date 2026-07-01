@@ -118,9 +118,10 @@ class RoomRepository:
 
                     for old_public_id in public_ids:
                         new_public_id = old_public_id.replace(fake_room_id, real_room_id)
+                        final_public_id = new_public_id.replace("temp/", "")
                         try:
                             renamed = await self.image_service.provider.rename_image(
-                                old_public_id, new_public_id
+                                old_public_id, final_public_id
                             )
                             final_photo_urls.append(renamed["url"])
                         except Exception as e:
@@ -345,9 +346,11 @@ class RoomRepository:
 
                     # Still under a fake id (uploaded fresh this edit session) — rename it
                     new_public_id = old_public_id.replace(current_folder_id, real_room_id)
+                    final_public_id = new_public_id.replace("temp/", "")
+
                     try:
                         renamed = await self.image_service.provider.rename_image(
-                            old_public_id, new_public_id
+                            old_public_id, final_public_id
                         )
                         final_photo_urls.append(renamed["url"])
                     except Exception as e:

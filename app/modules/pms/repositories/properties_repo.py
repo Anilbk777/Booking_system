@@ -108,10 +108,12 @@ class PropertyRepository:
             if photo_urls:
                 public_ids = [self.image_service.extract_public_id_from_url(url) for url in photo_urls]
                 fake_property_id = self.image_service.extract_fake_id_from_public_id(public_ids[0], "properties")
+                
                 for old_public_id in public_ids:
                     new_public_id = old_public_id.replace(fake_property_id, str(new_property.id))
+                    final_public_id = new_public_id.replace("temp/", "")
                     try:
-                        renamed = await self.image_service.provider.rename_image(old_public_id, new_public_id)
+                        renamed = await self.image_service.provider.rename_image(old_public_id, final_public_id)
                         final_photo_urls.append(renamed["url"])
                     except Exception as e:
                         logger.error(f"[PropertyRepository] Failed to rename image {old_public_id}: {str(e)}")
@@ -461,6 +463,8 @@ class PropertyRepository:
 
                 for url in clean_photo_urls:
                     old_public_id = self.image_service.extract_public_id_from_url(url)
+                  
+                        
                     current_folder_id = self.image_service.extract_fake_id_from_public_id(
                         old_public_id, "properties"
                     )
@@ -472,9 +476,11 @@ class PropertyRepository:
 
                     # Still under a fake id (uploaded fresh this edit session) — rename it
                     new_public_id = old_public_id.replace(current_folder_id, real_property_id)
+                    final_public_id = new_public_id.replace("temp/", "")
+
                     try:
                         renamed = await self.image_service.provider.rename_image(
-                            old_public_id, new_public_id
+                            old_public_id, final_public_id
                         )
                         final_photo_urls.append(renamed["url"])
                     except Exception as e:

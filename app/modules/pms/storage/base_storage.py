@@ -82,8 +82,8 @@ class CloudinaryImageStorage(ImageStorageStrategy):
             def _rename():
          
                 return cloudinary.uploader.rename(
-                    old_public_id,       # e.g. "test/properties/9f3a.../wtjpjac0..."
-                    new_public_id,       # e.g. "test/properties/a1b2.../wtjpjac0..."
+                    old_public_id,       # e.g. "/properties/9f3a.../wtjpjac0..."
+                    new_public_id,       # e.g. "/properties/a1b2.../wtjpjac0..."
                     resource_type="image",
                     overwrite=True,      # if something already exists at new_public_id, replace it
                     invalidate=True,     # purge any CDN-cached copy of the old URL

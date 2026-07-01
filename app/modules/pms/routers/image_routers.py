@@ -106,7 +106,7 @@ async def upload_image_property(user:CurrentUser, image:UploadFile = File(...), 
 
     fake_property_id = str(uuid.uuid4())
      
-    uploaded_image_url = await image_service._process_and_upload_single(folder_name=f"{user.tenant_id}/properties/{fake_property_id}", file=image)
+    uploaded_image_url = await image_service._process_and_upload_single(folder_name=f"temp/{user.tenant_id}/properties/{fake_property_id}", file=image)
   
     return {
         "success":True,
@@ -131,7 +131,7 @@ async def upload_image_property(property_id:uuid.UUID,user:CurrentUser, image:Up
 
     fake_room_id = str(uuid.uuid4())
      
-    uploaded_image_url = await image_service._process_and_upload_single(folder_name=f"properties/{property_id}/rooms/{fake_room_id}", file=image)
+    uploaded_image_url = await image_service._process_and_upload_single(folder_name=f"temp/properties/{property_id}/rooms/{fake_room_id}", file=image)
     
     return {
         "success":True,
