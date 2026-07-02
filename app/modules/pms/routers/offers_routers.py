@@ -68,6 +68,23 @@ async def get_property_special_offers(
     return {"success": True, "data": formatted_offers}
 
 
+@router.get("/{property_id}/special-offers/{offer_id}", response_model=StandardResponse[SpecialOfferResponse],status_code=status.HTTP_200_OK,)
+async def get_special_offer(
+    property_id:uuid.UUID,
+    offer_id: uuid.UUID,
+    user: CurrentUser,
+    offer_service: SpecialOfferService = Depends(get_special_offer_service),
+):
+    if user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not authorized to get special offers. You must belong to a tenant.",
+        )
+    offer = await offer_service.get_offer_by_id(offer_id=offer_id, property_id=property_id)
+    return {"success": True, "data": offer}
+
+
+
 @router.patch(
     "/{property_id}/special-offers/{offer_id}",
     response_model=StandardResponse[SpecialOfferResponse],
@@ -98,3 +115,26 @@ async def update_special_offer(
     formatted_offer = SpecialOfferResponse.model_validate(saved_model)
 
     return {"success": True, "data": formatted_offer}
+
+
+@router.delete(
+    "/{property_id}/special-offers/{offer_id}"
+)
+async def delete_special_offer(
+    property_id: uuid.UUID,
+    offer_id: uuid.UUID,
+    user: CurrentUser,
+    offer_service: SpecialOfferService = Depends(get_special_offer_service),
+):
+    if user.tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are not authorized to delete special offers. You must belong to a tenant.",
+        )
+
+    response = await offer_service.delete_offer(
+        property_id=property_id,
+        offer_id=offer_id,
+    )
+    if response:
+        return {"success": True, "data": "Offer deleted"}

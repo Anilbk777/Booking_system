@@ -1,7 +1,7 @@
 from app.modules.pms.services.room_services import RoomService
 from app.utils.logging import LoggerFactory
 from app.modules.pms.repositories.offers_repo import SpecialOfferRepository
-from app.modules.pms.schemas.offers_schema import SpecialOffersCreate, SpecialOfferBase
+from app.modules.pms.schemas.offers_schema import SpecialOffersCreate, SpecialOfferBase,SpecialOfferResponse
 
 import uuid
 from app.utils.exceptions import (
@@ -100,3 +100,49 @@ class SpecialOfferService:
                 f"[OfferService] Error orchestrating bulk offer update: {str(e)}"
             )
             raise ServiceException(f"Failed to update special offers: {str(e)}")
+
+    async def get_offer_by_id(self, offer_id:uuid.UUID, property_id:uuid.UUID):
+        logger.info(
+            f"[OfferService] Processing get offer for property: {property_id} and offer_id: {offer_id}"
+        )
+        try:
+            # Delegate handling directly to your atomic repository transaction method
+            existing_offer = await self.offer_repo.get_offer_by_id(offer_id=offer_id, property_id=property_id)
+            if not existing_offer:
+                logger.error(
+                    f"[OfferService] Offer {offer_id} not found under property context {property_id}."
+                )
+                raise OfferNotFoundException(
+                    "The requested special offer could not be found.",
+                    f"Offer with id {offer_id} not found for property {property_id}.",
+                )
+            return SpecialOfferResponse.model_validate(existing_offer)
+        
+        except (OfferNotFoundException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(
+                f"[OfferService] Error orchestrating get offer: {str(e)}"
+            )
+            raise ServiceException(f"Failed to get offer: {str(e)}")
+    
+    async def delete_offer(self, property_id:uuid.UUID,offer_id:uuid.UUID):
+        logger.info(
+            f"[OfferService] Processing deletion for offer: {offer_id}"
+        )
+
+        try:
+            await self.get_offer_by_id(offer_id,property_id)
+            # Delegate handling directly to your atomic repository transaction method
+            return await self.offer_repo.delete_offer(
+                property_id=property_id, offer_id=offer_id
+            )
+        except (OfferNotFoundException, RepositoryException):
+            raise
+
+        except Exception as e:
+            logger.error(
+                f"[OfferService] Error orchestrating bulk offer deletion: {str(e)}"
+            )
+            raise ServiceException(f"Failed to delete special offers: {str(e)}")
+        

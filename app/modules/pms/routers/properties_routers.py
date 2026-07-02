@@ -258,7 +258,7 @@ async def update_property_activation(
     return {"success": True, "data": "Property is activated"}
 
 
-@router.delete("/{property_id}", status_code=status.HTTP_200_OK)
+@router.delete("/{property_id}")
 async def delete_property(
     property_id: uuid.UUID,
     current_user: CurrentUser,

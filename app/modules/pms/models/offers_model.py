@@ -68,3 +68,5 @@ class SpecialOffer(Base, TimestampMixin):
             "property_id", "title", name="uq_property_special_offers_title"
         ),
     )
+
+

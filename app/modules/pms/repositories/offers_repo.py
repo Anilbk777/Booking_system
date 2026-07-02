@@ -1,9 +1,8 @@
 import uuid
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func ,delete ,select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
 from app.modules.pms.models.offers_model import SpecialOffer
 from app.utils.exceptions import (
@@ -45,8 +44,8 @@ class SpecialOfferRepository:
                 )
                 result = await self.db.execute(stmt)
                 if result.scalar_one_or_none():
-                    raise RepositoryException(
-                        f"An offer with the title '{clean_title}' already exists for this property."
+                    raise OfferNameAlreadyExistsException(
+                        f"An offer with the title '{clean_title}' already exists for this property.",
                     )
 
                 # 2. Instantiate individual offer instance
@@ -72,6 +71,10 @@ class SpecialOfferRepository:
             )
             return saved_offers
 
+        except OfferNameAlreadyExistsException:
+            await self.db.rollback()
+            raise
+
         except IntegrityError as e:
             await self.db.rollback()
             error_msg = str(e.orig) if hasattr(e, "orig") else str(e)
@@ -83,15 +86,14 @@ class SpecialOfferRepository:
                     "One of your offer dates fails the chronology constraint: start_date < end_date."
                 )
             raise RepositoryException(
-                "Database consistency error happened while executing bulk offer save."
+                "Failed to process bulk special offers",
+                f"Database consistency error happened while executing bulk offer save: {str(e)}"
             )
 
         except Exception as e:
             await self.db.rollback()
             logger.error(f"[OfferRepository] Unexpected rollback execution: {str(e)}")
-            raise RepositoryException(
-                f"Failed to process bulk special offers: {str(e)}"
-            )
+            raise RepositoryException("Failed to process bulk special offers",f"Failed to process bulk special offers: {str(e)}")
 
     async def get_all_offers(self, property_id: uuid.UUID):
         logger.info(f"[OfferRepository] Getting all offers for property: {property_id}")
@@ -102,7 +104,7 @@ class SpecialOfferRepository:
             return offers
         except Exception as e:
             logger.error(f"[OfferRepository] Error getting all offers: {str(e)}")
-            raise RepositoryException(f"Failed to get all offers: {str(e)}")
+            raise RepositoryException("Failed to get all offers",f"Failed to get all offers: {str(e)}")
 
     async def get_offer_by_id(self, offer_id: uuid.UUID, property_id: uuid.UUID):
         logger.info(
@@ -192,4 +194,37 @@ class SpecialOfferRepository:
             raise RepositoryException(
                 "Failed to complete offer data updates.",
                 f"Failed to update offer runtime states: {str(e)}",
+            )
+
+    async def delete_offer(self,offer_id:uuid.UUID,property_id:uuid.UUID):
+        logger.info(
+            f"[OfferRepository] Processing deletion for offer: {offer_id}"
+        )
+        try:
+            stmt = delete(SpecialOffer).where(
+                SpecialOffer.id == offer_id, SpecialOffer.property_id == property_id, SpecialOffer.is_custom == True
+            )
+            result = await self.db.execute(stmt)
+            if result.rowcount == 0:
+                logger.error(
+                    f"[OfferRepository] Offer {offer_id} not found under property context {property_id}."
+                )
+                raise OfferNotFoundException(
+                    "The requested special offer could not be found.",
+                    f"Offer with id {offer_id} not found for property {property_id}.",
+                )
+            await self.db.commit()
+            logger.info(
+                f"[OfferRepository] Offer {offer_id} successfully deleted."
+            )
+            return True
+        except OfferNotFoundException:
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[OfferRepository] Unexpected rollback execution: {str(e)}")
+            raise RepositoryException(
+                "Failed to delete  offer.",
+                f"Failed to delete offer: {str(e)}"
             )
