@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+from datetime import datetime, timezone, timedelta
 from app.utils.logging import LoggerFactory
 from app.utils.exceptions import ImageStorageException
 
@@ -98,6 +99,67 @@ class CloudinaryImageStorage(ImageStorageStrategy):
         except Exception as e:
             logger.error(f"Error renaming image {old_public_id} -> {new_public_id}: {str(e)}")
             raise ImageStorageException("Error renaming image", str(e))
+    
+    async def delete_temp_assets(self,public_id:str)->dict:
+        try:
+            def _delete():
+                return cloudinary.uploader.destroy(
+                    public_id,
+                    resource_type="image",
+                    invalidate=True,
+                )
+            
+            response = await asyncio.to_thread(_delete)
+            logger.info(f"[CloudinaryImageStorage] Image deleted successfully from Cloudinary at {public_id}")
+            return response
+        except Exception as e:
+            logger.error(f"Error deleting image {public_id}: {str(e)}")
+            raise ImageStorageException("Error deleting image", str(e))
+
+    async def clean_old_temp_images(self):
+        """
+        Finds all images older than 24 hours under the "temp*" path and deletes them concurrently.
+        """
+        # 1. Calculate 24-hour cutoff time
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
+        expression_time = cutoff_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        
+        search_expression = f"uploaded_at:[* TO \"{expression_time}\"] AND public_id:temp*"
+        logger.info(f"Scanning Cloudinary for stale temp assets: {search_expression}")
+
+        try:
+            # 2. Run the search query off the main thread (Cloudinary Search API is blocking)
+            def _search():
+                return cloudinary.Search()\
+                    .expression(search_expression)\
+                    .max_results(100)\
+                    .execute()
+
+            search_result = await asyncio.to_thread(_search)
+            resources = search_result.get("resources", [])
+
+            if not resources:
+                logger.info("No temporary images older than 24 hours found.")
+                return
+
+            # 3. Extract public IDs
+            public_ids = [asset["public_id"] for asset in resources]
+            logger.info(f"Found {len(public_ids)} stale images. Executing concurrent deletion...")
+
+            # 4. Fire all deletion tasks concurrently using asyncio.gather
+            tasks = [self.delete_temp_assets(pid) for pid in public_ids]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # 5. Optional evaluation of concurrent execution results
+            for pid, res in zip(public_ids, results):
+                if isinstance(res, Exception):
+                    logger.error(f"Failed concurrent deletion for {pid}: {res}")
+                else:
+                    logger.info(f"Concurrent deletion verified for {pid}")
+
+        except Exception as e:
+            logger.error(f"Failed to complete scheduled temp file sweep: {str(e)}")
+
 
 class StorageFactory:
     @staticmethod
