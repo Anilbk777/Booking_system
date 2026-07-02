@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, select, func, delete
 from app.modules.pms.models.discount_code_model import DiscountCode
 from app.utils.logging import LoggerFactory
 from app.utils.exceptions import RepositoryException
@@ -101,3 +101,21 @@ class DiscountCodeRepository:
         except Exception as e:
             logger.error(f"[DiscountCodeRepository] Unexpected update failure: {str(e)}")
             raise RepositoryException("Failed to update database discount code record", str(e))
+
+    async def delete_discount_code(self, property_id: uuid.UUID, discount_id: uuid.UUID) -> bool:
+        """
+        Executes a targeted bulk deletion statement without loading rows into Python memory.
+        Returns True if a row was deleted, False if no row matched.
+        """
+        logger.info(f"[DiscountCodeRepository] Executing delete statement for discount {discount_id}")
+        try:
+            stmt = delete(DiscountCode).where(
+                DiscountCode.id == discount_id,
+                DiscountCode.property_id == property_id
+            )
+            result = await self.db.execute(stmt)
+            return result.rowcount > 0
+            
+        except Exception as e:
+            logger.error(f"[DiscountCodeRepository] Database error during deletion: {str(e)}")
+            raise RepositoryException("Database error during discount code deletion", str(e))

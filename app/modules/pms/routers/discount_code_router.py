@@ -84,7 +84,7 @@ async def update_discount_code(
         "data":updated_discount
     }
 
-@router.delete("/{discount_id}",response_model=StandardResponse[DiscountCodeResponse], status_code=status.HTTP_200_OK)
+@router.delete("/{discount_id}",status_code=status.HTTP_200_OK)
 async def delete_discount_code(
     property_id: uuid.UUID,
     discount_id: uuid.UUID,
@@ -97,9 +97,9 @@ async def delete_discount_code(
             detail="You are not authorized to delete discount code. You must belong to an active tenant.",
         )
     
-    deleted_discount = await discount_code_service.delete_discount_code(property_id=property_id, discount_id=discount_id)
+    await discount_code_service.delete_discount_code(property_id=property_id, discount_id=discount_id)
     
     return {
         "success":True,
-        "data":deleted_discount
+        "message":"Discount Code deleted successfully"
     }

@@ -142,3 +142,33 @@ class DiscountCodeService:
             await self.discount_code_repo.db.rollback()
             logger.error(f"[DiscountCodeService] Unexpected failure during update: {str(e)}")
             raise ServiceException(f"An unexpected internal error occurred: {str(e)}")
+
+    async def delete_discount_code(self, property_id: uuid.UUID, discount_id: uuid.UUID) -> None:
+       
+        logger.info(f"[DiscountCodeService] Initiating deletion process for discount {discount_id} under property {property_id}")
+        try:
+            # 1. Fetch current database record to inspect business metrics
+            db_discount = await self.discount_code_repo.get_discount_code_by_id(property_id, discount_id)
+            if not db_discount:
+                logger.warning(f"[DiscountCodeService] Delete failed. Discount code '{discount_id}' not found.")
+                raise DiscountCodeNotFoundException("Discount code not found")
+
+            # 2. Business Rule: Guard historical tracking data (Block deletion if already used)
+            # if db_discount.used_count > 0:
+            #     logger.warning(f"[DiscountCodeService] Delete rejected. Discount '{discount_id}' has a used_count of {db_discount.used_count}.")
+            #     raise DiscountCodeValidationError("Cannot delete this discount code because it has already been used by customers.")
+
+            # 3. Proceed to repository layer for database execution
+            await self.discount_code_repo.delete_discount_code(property_id, discount_id)
+            
+            # 4. Commit transaction safely
+            await self.discount_code_repo.db.commit()
+            logger.info(f"[DiscountCodeService] Discount code '{discount_id}' deleted and committed successfully.")
+
+        except (DiscountCodeNotFoundException, DiscountCodeValidationError, RepositoryException):
+            await self.discount_code_repo.db.rollback()
+            raise
+        except Exception as e:
+            await self.discount_code_repo.db.rollback()
+            logger.error(f"[DiscountCodeService] Unexpected failure during deletion: {str(e)}")
+            raise ServiceException(f"An unexpected internal error occurred: {str(e)}")
