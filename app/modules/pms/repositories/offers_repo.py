@@ -202,9 +202,11 @@ class SpecialOfferRepository:
         )
         try:
             stmt = delete(SpecialOffer).where(
-                SpecialOffer.id == offer_id, SpecialOffer.property_id == property_id, SpecialOffer.is_custom == True
+                SpecialOffer.id == offer_id, SpecialOffer.property_id == property_id, SpecialOffer.is_custom == True,
             )
+
             result = await self.db.execute(stmt)
+
             if result.rowcount == 0:
                 logger.error(
                     f"[OfferRepository] Offer {offer_id} not found under property context {property_id}."

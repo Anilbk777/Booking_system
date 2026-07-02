@@ -1,15 +1,5 @@
 import uuid
 
-# from fastapi import UploadFile
-# from starlette.concurrency import run_in_threadpool
-
-# from app.modules.pms.models.properties_model import (
-#     Amenity,
-#     Property,
-#     PropertyAmenity,
-#     PropertyHotelDetail,
-#     PropertyPhoto,
-# )
 from app.modules.pms.repositories.properties_repo import PropertyRepository
 from app.modules.pms.schemas.properties_schemas import (
     PropertyCreate,
@@ -32,7 +22,7 @@ class PropertyService:
     def __init__(self, property_repository: PropertyRepository):
         self.property_repository = property_repository
 
-
+            
     async def create_property(self, payload: PropertyCreate, tenant_id: uuid.UUID):
         logger.info(f"[PropertyService] Creating property: {payload}")
         # 1. Convert Pydantic payload to clean dictionary mappings

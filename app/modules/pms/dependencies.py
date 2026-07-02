@@ -12,6 +12,10 @@ from app.modules.pms.services.offers_services import SpecialOfferService
 
 from app.modules.pms.services.image_services import ImageService
 
+
+from app.modules.pms.repositories.discount_code_repo import DiscountCodeRepository
+from app.modules.pms.services.discount_code_service import DiscountCodeService
+
 from app.config.database_config import get_db
 from fastapi import Depends
 
@@ -36,4 +40,5 @@ def get_special_offer_service(
 ) -> SpecialOfferService:
     return SpecialOfferService(special_offer_repo=SpecialOfferRepository(db=db))
 
-
+def get_discount_code_service(db=Depends(get_db)) -> DiscountCodeService:
+    return DiscountCodeService(discount_code_repo=DiscountCodeRepository(db=db))

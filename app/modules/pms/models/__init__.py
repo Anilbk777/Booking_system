@@ -8,6 +8,7 @@ from .properties_model import (
 )
 from .rooms_model import RoomType, BedType, Rooms, RoomPhoto
 from .offers_model import SpecialOffer
+from .discount_code_model import DiscountCode
 
 __all__ = [
     "Tenant",
@@ -21,4 +22,5 @@ __all__ = [
     "Rooms",
     "RoomPhoto",
     "SpecialOffer",
+    "DiscountCode"
 ]
