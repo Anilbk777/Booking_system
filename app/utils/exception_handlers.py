@@ -57,7 +57,7 @@ async def handle_request_validation_error(
         # Get the last item (the actual field), replace underscores, and capitalize words
         field_name = str(loc[-1]).replace("_", " ").title()
     else:
-        field_name = "Input value"
+        field_name = "Input "
 
     # 3. Handle custom readable messages based on error types
     error_type = first_error.get("type", "")

@@ -63,7 +63,7 @@ async def get_discount_code(
         "data":discount_code
     }
 
-@router.patch("/{discount_id}",response_model=DiscountCodeResponse, status_code=status.HTTP_200_OK)
+@router.patch("/{discount_id}",response_model=StandardResponse[DiscountCodeResponse], status_code=status.HTTP_200_OK)
 async def update_discount_code(
     property_id: uuid.UUID,
     discount_id: uuid.UUID,

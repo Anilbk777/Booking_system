@@ -1,11 +1,11 @@
 import uuid
 from app.modules.pms.repositories.discount_code_repo import DiscountCodeRepository
-from app.modules.pms.schemas.discount_code_schema import DiscountCodeCreate , DiscountCodeResponse
+from app.modules.pms.schemas.discount_code_schema import DiscountCodeCreate , DiscountCodeResponse, DiscountCodeUpdate
 
 from app.utils.logging import LoggerFactory
-from app.utils.exceptions import ServiceException,RepositoryException,DiscountCodeAlreadyExistException,DiscountCodeNotFoundException
+from app.utils.exceptions import ServiceException,RepositoryException,DiscountCodeAlreadyExistException,DiscountCodeNotFoundException,DiscountCodeValidationError
 
-# from app.modules.pms.models.discount_code_model import DiscountCode
+from app.modules.pms.models.discount_code_model import DiscountType
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -18,9 +18,7 @@ class DiscountCodeService:
 
         try: 
             db_discount = await self.discount_code_repo.get_discount_code(property_id, code)
-            if db_discount:
-                return True
-            return False
+            return True if db_discount else False
         except RepositoryException:
             raise
 
@@ -77,7 +75,7 @@ class DiscountCodeService:
             db_discount = await self.discount_code_repo.get_discount_code_by_id(property_id,discount_id)
             if not db_discount:
                 logger.info(f"[DiscountCodeService] Discount code '{discount_id}' not found for property: {property_id}")
-                raise DiscountCodeNotFoundException(f"Discount code '{discount_id}' not found for property: {property_id}")
+                raise DiscountCodeNotFoundException("Discount code not found")
 
             logger.info(f"[DiscountCodeService] Discount code '{discount_id}' fetched successfully for property: {property_id}")
             return DiscountCodeResponse.model_validate(db_discount)
@@ -88,3 +86,59 @@ class DiscountCodeService:
             logger.error(f"[DiscountCodeService] Error fetching discount code: {str(e)}")
             raise ServiceException(f"An unexpected internal error occurred: {str(e)}")
         
+    async def update_discount_code(self, property_id: uuid.UUID, discount_id: uuid.UUID, payload: DiscountCodeUpdate) -> DiscountCodeResponse:
+        """Handles stateful business merging validations and pushes partial updates to the database."""
+        logger.info(f"[DiscountCodeService] Updating discount code for property: {property_id} and discount code: {discount_id}")
+        try:
+            # 1. Fetch current database record
+            db_discount = await self.discount_code_repo.get_discount_code_by_id(property_id, discount_id)
+            if not db_discount:
+                logger.warning(f"Discount code '{discount_id}' not found for property: {property_id}")
+                raise DiscountCodeNotFoundException("Discount code not found")
+
+            # 2. Extract changes (Exit early if payload is empty)
+            update_data = payload.model_dump(exclude_unset=True)
+            if not update_data:
+                logger.info("No updated data provided")
+                return DiscountCodeResponse.model_validate(db_discount)
+            
+            # Verify code uniqueness only if it is explicitly changing to a new value
+            if "code" in update_data:
+                new_code = update_data["code"].strip().upper()
+                if new_code != db_discount.code:
+                    exist = await self._exists_by_code(property_id, new_code)
+                    if exist:
+                        logger.warning(f"Discount code '{new_code}' already exists for property: {property_id}")
+                        raise DiscountCodeAlreadyExistException(f"Discount code '{new_code}' already exists")
+
+            # 3. Merge State Validation: Combine incoming changes with existing DB records
+            final_type = update_data.get("type", db_discount.type)
+            final_value = update_data.get("discount_value", db_discount.discount_value)
+            final_min = update_data.get("min_amount", db_discount.min_amount)
+            final_from = update_data.get("valid_from", db_discount.valid_from)
+            final_to = update_data.get("valid_to", db_discount.valid_to)
+
+            # Enforce combined system rules
+            if final_to <= final_from:
+                raise DiscountCodeValidationError("The expiration date must occur after the start date.")
+                
+            if final_type == DiscountType.PERCENTAGE and final_value > 100:
+                raise DiscountCodeValidationError("Percentage discount values cannot exceed 100%.")
+                
+            if final_type == DiscountType.FIXED and final_value > final_min:
+                raise DiscountCodeValidationError("Fixed discount cannot be greater than the minimum required spend.")
+
+            # 4. Save and Commit using your Repository session link bindings
+            updated_record = await self.discount_code_repo.update_discount_code(db_discount, update_data)
+            await self.discount_code_repo.db.commit()
+            await self.discount_code_repo.db.refresh(updated_record)
+
+            return DiscountCodeResponse.model_validate(updated_record)
+
+        except (DiscountCodeNotFoundException, DiscountCodeAlreadyExistException, DiscountCodeValidationError, RepositoryException):
+            await self.discount_code_repo.db.rollback()
+            raise
+        except Exception as e:
+            await self.discount_code_repo.db.rollback()
+            logger.error(f"[DiscountCodeService] Unexpected failure during update: {str(e)}")
+            raise ServiceException(f"An unexpected internal error occurred: {str(e)}")

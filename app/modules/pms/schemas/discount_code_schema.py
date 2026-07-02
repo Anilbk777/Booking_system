@@ -12,30 +12,47 @@ class DiscountType(str, Enum):
 
 
 # 2. Base Configuration (Shared across fields)
-class DiscountCodeBase(BaseModel):
-    code: str = Field(...,title="Code", min_length=2, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$", description="Alphanumeric code in uppercase")
-    type: DiscountType = Field(...,title="Discount Type")
-    discount_value: float = Field(...,title="Discount Value", gt=0, description="Discount value must be greater than 0")
-    min_amount: float = Field(default=0.0,title="Minimum Amount", ge=0, description="Minimum order amount must be 0 or positive")
-    max_uses: int = Field(...,title="Maximum Uses", gt=0, description="Max uses must be greater than 0")
-    valid_from: datetime 
-    valid_to: datetime 
 
-    # Strip whitespace and convert code string to uppercase automatically
+class DiscountCodeBase(BaseModel):
+    code: str = Field(..., title="Code", min_length=2, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$", description="Alphanumeric code")
+    type: DiscountType = Field(..., title="Discount Type")
+    discount_value: float = Field(..., title="Discount Value", gt=0, description="Discount value must be greater than 0")
+    min_amount: float = Field(default=0.0, title="Minimum Amount", ge=0, description="Minimum order amount must be 0 or positive")
+    max_uses: int = Field(..., title="Maximum Uses", gt=0, description="Max uses must be greater than 0")
+    valid_from: datetime = Field(..., title="Valid From")
+    valid_to: datetime = Field(..., title="Valid To")
+
+    # 1. Field-level: Strip whitespace and convert code string to uppercase automatically
     @field_validator("code")
     @classmethod
     def clean_code(cls, v: str) -> str:
         return v.strip().upper()
 
-    # Enforce percentage ceiling validation logic
+    # 2. Field-level: Absolute maximum numerical cap checks
     @field_validator("discount_value")
     @classmethod
-    def validate_percentage(cls, v: float, info) -> float:
-        # Check if 'type' is accessible and equals PERCENTAGE
+    def validate_caps(cls, v: float, info) -> float:
         if "type" in info.data and info.data["type"] == DiscountType.PERCENTAGE:
             if v > 100:
                 raise ValueError("Percentage discount cannot exceed 100%")
-        return v
+
+        if "type" in info.data and info.data["type"] == DiscountType.FIXED:
+            if v > 100000:
+                raise ValueError("Fixed discount value cannot exceed 100000")
+        return v    
+
+    # 3. Model-level: Comprehensive cross-field logical checks
+    @model_validator(mode="after")
+    def validate_complex_business_rules(self) -> "DiscountCodeBase":
+        # Rule A: Enforce chronological dates range validation
+        if self.valid_to <= self.valid_from:
+            raise ValueError("The expiration date ('valid to') must occur strictly after the start date ('valid from')")
+
+        # Rule B: Enforce that fixed deductions cannot be greater than the minimum spend threshold
+        if self.type == DiscountType.FIXED and self.discount_value > self.min_amount:
+            raise ValueError("Fixed discount cannot be greater than the minimum required spend configuration")
+
+        return self
     
 
 
@@ -51,7 +68,7 @@ class DiscountCodeCreate(DiscountCodeBase):
 
 # 4. Update Schema (Request body for PATCH requests - all fields optional)
 class DiscountCodeUpdate(BaseModel):
-    code: Optional[str] = Field(None, min_length=2, max_length=50, pattern=r"^[A-Z0-9_-]+$")
+    code: Optional[str] = Field(None, min_length=2, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$")
     type: Optional[DiscountType] = None
     discount_value: Optional[float] = Field(None, gt=0)
     min_amount: Optional[float] = Field(None, ge=0)
@@ -70,7 +87,7 @@ class DiscountCodeUpdate(BaseModel):
     def validate_update_fields(self) -> "DiscountCodeUpdate":
         # Percentage caps check on update values
         current_type = self.type
-        if self.value is not None and current_type == DiscountType.PERCENTAGE and self.value > 100:
+        if self.discount_value is not None and current_type == DiscountType.PERCENTAGE and self.discount_value > 100:
             raise ValueError("Percentage discount cannot exceed 100%")
 
         # Date chronologies check on update parameters

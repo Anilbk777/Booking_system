@@ -4,6 +4,7 @@ from app.modules.pms.models.discount_code_model import DiscountCode
 from app.utils.logging import LoggerFactory
 from app.utils.exceptions import RepositoryException
 import uuid
+from typing import Any
 
 logger = LoggerFactory.get_logger(__name__)
 class DiscountCodeRepository:
@@ -41,14 +42,11 @@ class DiscountCodeRepository:
         logger.info(f"[DiscountCodeRepository] get for code '{discount_id}' under property {property_id}")
         try:
             stmt = select(DiscountCode).where(
-                and_(
-                    DiscountCode.property_id == property_id,
-                    DiscountCode.id == discount_id
-                )
+                DiscountCode.id == discount_id,
+                DiscountCode.property_id == property_id
             )
             result = await self.db.execute(stmt)
-            db_discount = result.scalar_one_or_none()
-            return db_discount
+            return result.scalar_one_or_none()
         except Exception as e:
             logger.error(f"[DiscountCodeRepository] Error getting discount code: {str(e)}")
             raise RepositoryException(
@@ -87,3 +85,19 @@ class DiscountCodeRepository:
                 "Failed to fetch discount codes",
                 f"Error fetching discount codes: {str(e)}"
             )
+
+    async def update_discount_code(self, db_discount: DiscountCode, update_data: dict[str, Any]) -> DiscountCode:
+        """Applies dynamic updates sequentially and flushes changes to the transaction context."""
+        logger.info(f"[DiscountCodeRepository] Staging updates for discount code {db_discount.id}")
+        try:
+            for field, value in update_data.items():
+                setattr(db_discount, field, value)
+            
+            await self.db.flush()
+            return db_discount
+        except IntegrityError as e:
+            logger.error(f"[DiscountCodeRepository] Uniqueness conflict on update: {str(e)}")
+            raise DiscountCodeDuplicateException("A discount code with this name already exists for this property.", str(e))
+        except Exception as e:
+            logger.error(f"[DiscountCodeRepository] Unexpected update failure: {str(e)}")
+            raise RepositoryException("Failed to update database discount code record", str(e))
