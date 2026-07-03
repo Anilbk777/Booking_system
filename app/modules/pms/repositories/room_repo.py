@@ -20,6 +20,7 @@ from app.utils.exceptions import (
     RoomNotFoundException,
     AmenityNotFoundException,
     ImageStorageException,
+    InvalidImageException
 )
 from app.utils.logging import LoggerFactory
 
@@ -165,7 +166,8 @@ class RoomRepository:
             await self.db.commit()
             return saved_batch_results
 
-        except ImageStorageException:
+        except (ImageStorageException,InvalidImageException):
+            await self.db.rollback()
             raise
 
 
@@ -406,7 +408,7 @@ class RoomRepository:
                 "room_amenities": amenities_list,
             }
 
-        except (RoomNotFoundException, RoomNameAlreadyExistsException, ImageStorageException):
+        except (RoomNotFoundException, RoomNameAlreadyExistsException, ImageStorageException, InvalidImageException):
             await self.db.rollback()
             raise
 

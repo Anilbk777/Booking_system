@@ -31,11 +31,16 @@ class RepositoryException(AppBaseException):
 class ServiceException(AppBaseException):
     """Raised when business logic fails unexpectedly."""
 
-    def __init__(self, internal_detail: str):
+    def __init__(
+        self,
+        user_message: str = "An internal error occurred while processing your request.",
+        internal_detail: str = None,
+        status_code: int = 500,
+    ):
         super().__init__(
-            user_message="An internal error occurred while processing your request.",
+            user_message=user_message,
             internal_detail=internal_detail,
-            status_code=500,
+            status_code=status_code,
         )
 
 

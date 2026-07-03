@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, time
+from datetime import datetime, time, date, timedelta
 from decimal import Decimal
 from typing import Annotated, Any, List, Optional
 
@@ -17,6 +17,7 @@ from pydantic import (
 from app.modules.pms.models.properties_model import PropertyType
 
 MAX_IMAGES_PER_PROPERTY = 20
+
 
 # ---------------------------------------------------------
 # Custom AM/PM Time Parser & Serializer Using Annotated
@@ -79,9 +80,22 @@ class PropertyHotelDetailBase(BaseModel):
     check_in_time_to: Time12Hour
     check_out_time_from: Time12Hour
     check_out_time_to: Time12Hour
-    total_rooms: int = Field(default=1, ge=1, title="Total Rooms", description="Total number of rooms")
-    year_built: Optional[int] = Field(None, ge=1800, le=2100, title="Year Built", description="Year when the property was built")
-    number_of_floors: int = Field(default=1, ge=1, title="Number of Floors", description="Number of floors in the property")
+    total_rooms: int = Field(
+        default=1, ge=1, title="Total Rooms", description="Total number of rooms"
+    )
+    year_built: Optional[int] = Field(
+        None,
+        ge=1800,
+        le=2100,
+        title="Year Built",
+        description="Year when the property was built",
+    )
+    number_of_floors: int = Field(
+        default=1,
+        ge=1,
+        title="Number of Floors",
+        description="Number of floors in the property",
+    )
 
     @model_validator(mode="after")
     def validate_time_sequences(self) -> "PropertyHotelDetailBase":
@@ -101,7 +115,13 @@ class PropertyHotelDetailResponse(PropertyHotelDetailBase, TimestampSchema):
 
 
 class AmenityBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100, title="Amenity Name", description="Name of the amenity")
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        title="Amenity Name",
+        description="Name of the amenity",
+    )
     is_default: bool = Field(default=False)
 
 
@@ -112,17 +132,69 @@ class AmenityResponse(AmenityBase, TimestampSchema):
 
 
 class PropertyBase(BaseModel):
-    name: str = Field(..., min_length=2, max_length=255, title="Property Name", description="Name of the property")
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=255,
+        title="Property Name",
+        description="Name of the property",
+    )
     type: PropertyType = Field(default=PropertyType.HOTEL)
-    description: Optional[str] = Field(None, max_length=2000, title="Description", description="Description of the property")
-    country: str = Field(..., min_length=2, max_length=100, title="Country", description="Country of the property")
-    state: str = Field(..., min_length=2, max_length=100, title="State", description="State of the property")
-    city: str = Field(..., min_length=2, max_length=100, title="City", description="City of the property")
-    zip_code: str = Field(..., min_length=2, max_length=10, title="Zip Code", description="Zip code of the property")
-    address: str = Field(..., min_length=2, max_length=255, title="Address", description="Address of the property")
-    latitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6, title="Latitude", description="Latitude of the property")
-    longitude: Optional[Decimal] = Field(None, max_digits=9, decimal_places=6, title="Longitude", description="Longitude of the property")
-
+    description: Optional[str] = Field(
+        None,
+        max_length=2000,
+        title="Description",
+        description="Description of the property",
+    )
+    country: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        title="Country",
+        description="Country of the property",
+    )
+    state: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        title="State",
+        description="State of the property",
+    )
+    city: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        title="City",
+        description="City of the property",
+    )
+    zip_code: str = Field(
+        ...,
+        min_length=2,
+        max_length=10,
+        title="Zip Code",
+        description="Zip code of the property",
+    )
+    address: str = Field(
+        ...,
+        min_length=2,
+        max_length=255,
+        title="Address",
+        description="Address of the property",
+    )
+    latitude: Optional[Decimal] = Field(
+        None,
+        max_digits=9,
+        decimal_places=6,
+        title="Latitude",
+        description="Latitude of the property",
+    )
+    longitude: Optional[Decimal] = Field(
+        None,
+        max_digits=9,
+        decimal_places=6,
+        title="Longitude",
+        description="Longitude of the property",
+    )
 
 
 class PropertyCreate(PropertyBase):
@@ -130,7 +202,6 @@ class PropertyCreate(PropertyBase):
     hotel_detail: PropertyHotelDetailBase
     amenities: List[AmenityBase] = Field(default_factory=list)
     photo_urls: List[str] = Field(default_factory=list)
-
 
     @field_validator("amenities")
     @classmethod
@@ -230,11 +301,56 @@ class PropertyDetailResponse(PropertyBase, TimestampSchema):
     model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
 
 
-
 class DefaultAmenityResponse(BaseModel):
-    id: uuid.UUID = Field(..., description="The unique identifier of the default amenity")
+    id: uuid.UUID = Field(
+        ..., description="The unique identifier of the default amenity"
+    )
     name: str = Field(..., description="The display name of the default amenity")
-    is_default: bool = Field(..., description="Flag indicating if this is a global system default")
+    is_default: bool = Field(
+        ..., description="Flag indicating if this is a global system default"
+    )
 
     # Enforce Pydantic V2 to safely parse from SQLAlchemy ORM models
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PropertySearchQueryParams(BaseModel):
+    destination: str = Field(
+        ...,
+        description="Search by name, country, state, city, or address",
+        max_length=100,
+    )
+    check_in: date = Field(..., description="Check-in date")
+    check_out: date = Field(..., description="Check-out date")
+    adults: int = Field(default=1, ge=1, le=30, description="Number of adults")
+    children: int = Field(default=0, ge=0, le=15, description="Number of children")
+    room_count: int = Field(
+        default=1, ge=1, le=30, description="Minimum available rooms required"
+    )
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "PropertySearchQueryParams":
+        self.destination = self.destination.strip().lower()
+        check_in = self.check_in
+        check_out = self.check_out
+        today = date.today()
+        if check_out <= check_in:
+            raise ValueError("check out must be after check in")
+        if check_in < today:
+            raise ValueError("check in must be after today")
+        if check_out > today + timedelta(days=365 * 3):
+            raise ValueError("check out must be within three years from today")
+        return self
+
+
+class PropertySearchResponse(BaseModel):
+    property_id: uuid.UUID
+    property_name: str
+    lowest_price: Decimal
+    address: str
+    city: str
+    state: str
+    country: str
+    photo_url: Optional[str | None] = Field(default=None)
+
     model_config = ConfigDict(from_attributes=True)

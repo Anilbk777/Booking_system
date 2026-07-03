@@ -4,6 +4,8 @@ from app.modules.pms.repositories.properties_repo import PropertyRepository
 from app.modules.pms.schemas.properties_schemas import (
     PropertyCreate,
     DefaultAmenityResponse,
+    PropertySearchQueryParams,
+    PropertySearchResponse,
 )
 from app.utils.exceptions import (
     PropertyAlreadyExistsException,
@@ -12,6 +14,9 @@ from app.utils.exceptions import (
     ServiceException,
     UnauthorizedException,
     DefaultAmenityNotExistsException,
+    InvalidDateException,
+    InvalidImageException,
+    ImageStorageException,
 )
 from app.utils.logging import LoggerFactory
 
@@ -22,7 +27,6 @@ class PropertyService:
     def __init__(self, property_repository: PropertyRepository):
         self.property_repository = property_repository
 
-            
     async def create_property(self, payload: PropertyCreate, tenant_id: uuid.UUID):
         logger.info(f"[PropertyService] Creating property: {payload}")
         # 1. Convert Pydantic payload to clean dictionary mappings
@@ -54,7 +58,12 @@ class PropertyService:
                 photo_urls=photo_urls_data,
             )
 
-        except (RepositoryException, DefaultAmenityNotExistsException):
+        except (
+            RepositoryException,
+            DefaultAmenityNotExistsException,
+            InvalidImageException,
+            ImageStorageException,
+        ):
             raise
 
         except Exception as e:
@@ -134,6 +143,8 @@ class PropertyService:
             PropertyAlreadyExistsException,
             UnauthorizedException,
             RepositoryException,
+            InvalidImageException,
+            ImageStorageException
         ):
             raise
         except Exception as e:
@@ -196,3 +207,60 @@ class PropertyService:
         except Exception as e:
             logger.error(f"[PropertyService] Error getting all amenities: {str(e)}")
             raise ServiceException(str(e))
+
+    async def search_properties(
+        self, params: PropertySearchQueryParams
+    ) -> list[PropertySearchResponse]:
+        logger.info(
+            "[PropertyService] Getting all properties for given search parameters"
+        )
+        if params.check_out <= params.check_in:
+            logger.error(
+                f"[PropertyService] Check_out date {params.check_out} is before the check_in date {params.check_out}"
+            )
+            raise InvalidDateException(
+                user_message="Check-out date must be after check-in date.",
+            )
+
+        try:
+            db_results = await self.property_repository.get_available_properties(
+                destination=params.destination,
+                check_in=params.check_in,
+                check_out=params.check_out,
+                adults=params.adults,
+                children=params.children,
+                room_count=params.room_count,
+            )
+
+            logger.info(
+                f"[PropertyService] Found {len(db_results)} properties for the given search parameters"
+            )
+
+            return [
+                PropertySearchResponse(
+                    property_id=row.property_id,
+                    property_name=row.property_name,
+                    lowest_price=row.lowest_price,
+                    address=row.address,
+                    city=row.city,
+                    state=row.state,
+                    country=row.country,
+                    photo_url=row.photo_url if row.photo_url else "",
+                )
+                for row in db_results
+            ]
+
+        except (
+            InvalidDateException,
+            PropertyNotFoundException,
+            ImageStorageException,
+            RepositoryException,
+        ):
+            raise
+
+        except Exception as e:
+            logger.error(f"[PropertyService] Error searching properties: {str(e)}")
+            raise ServiceException(
+                "Failed to get the properties for given search parameters",
+                f"Failed to get the search properties{str(e)}",
+            )

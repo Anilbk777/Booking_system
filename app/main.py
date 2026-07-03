@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+# from fastapi.staticfiles import StaticFiles
 
 from app.config.database_config import Base, engine
 
@@ -19,10 +19,11 @@ from app.modules.pms.routers.tenants_routers import router as tenant_router
 from app.modules.pms.routers.offers_routers import router as offer_router
 from app.modules.pms.routers.image_routers import router as image_router
 from app.modules.pms.routers.discount_code_router import router as discount_code_router
+
+from app.modules.booking.models import *
 from app.utils.exception_handlers import register_exception_handlers
 
 load_dotenv()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,7 +53,6 @@ app = FastAPI(
     lifespan=lifespan, title="StayEasy API", version="1.0.0", root_path="/api/v1"
 )
 
-# Add CORS middleware BEFORE exception handlers and routers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,

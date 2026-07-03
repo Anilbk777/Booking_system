@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, time
+from datetime import  time
 from decimal import Decimal
 from enum import StrEnum
 from typing import List, Optional
@@ -7,7 +7,6 @@ from typing import List, Optional
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -15,7 +14,6 @@ from sqlalchemy import (
     String,
     Time,
     UniqueConstraint,
-    func,
     text,
 )
 from sqlalchemy import (

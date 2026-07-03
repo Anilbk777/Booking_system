@@ -15,6 +15,8 @@ from app.utils.exceptions import (
     UnauthorizedException,
     RoomNotFoundException,
     AmenityNotFoundException,
+    InvalidImageException,
+    ImageStorageException,
 )
 from app.utils.logging import LoggerFactory
 
@@ -75,7 +77,12 @@ class RoomService:
                 "[RoomService] Validation rules failed before transaction initialization."
             )
             raise
-        except (RoomNameAlreadyExistsException, RepositoryException):
+        except (
+            RoomNameAlreadyExistsException,
+            RepositoryException,
+            InvalidImageException,
+            ImageStorageException,
+        ):
             raise
         except Exception as e:
             logger.error(f"[RoomService] Error executing room creation batch: {str(e)}")
@@ -196,6 +203,8 @@ class RoomService:
             RoomNameAlreadyExistsException,
             AmenityNotFoundException,
             RepositoryException,
+            InvalidImageException,
+            ImageStorageException,
         ):
             logger.warning(
                 "[RoomService] Validation rules failed before transaction initialization."
@@ -218,12 +227,16 @@ class RoomService:
                 room_id=room_id,
                 hotel_id=hotel_id,
             )
-            logger.info(f"[RoomService] Room '{deleted_room.room_name}' deleted successfully.")
+            logger.info(
+                f"[RoomService] Room '{deleted_room.room_name}' deleted successfully."
+            )
             return {
-                "success":True,
-                "data": {"message": f"Room '{deleted_room.room_name}' deleted successfully."}
+                "success": True,
+                "data": {
+                    "message": f"Room '{deleted_room.room_name}' deleted successfully."
+                },
             }
-        
+
         except (
             PropertyNotFoundException,
             UnauthorizedException,

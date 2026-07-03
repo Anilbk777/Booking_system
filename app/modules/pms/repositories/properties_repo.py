@@ -1,7 +1,7 @@
 from app.modules.pms.services.image_services import ImageService
 import uuid
-
-from sqlalchemy import and_, delete, func, select
+from datetime import date
+from sqlalchemy import and_, delete, func, select, or_, not_
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -13,11 +13,18 @@ from app.modules.pms.models.properties_model import (
     PropertyHotelDetail,
     PropertyPhoto,
 )
+from app.modules.booking.models.booking_model import (
+    BookingRoom,
+    Booking,
+    MasterBookingStatus,
+)
+from app.modules.pms.models.rooms_model import Rooms
 from app.utils.exceptions import (
     DefaultAmenityNotExistsException,
     RepositoryException,
     PropertyNotFoundException,
     ImageStorageException,
+    InvalidImageException,
 )
 from app.utils.logging import LoggerFactory
 
@@ -25,7 +32,7 @@ logger = LoggerFactory.get_logger(__name__)
 
 
 class PropertyRepository:
-    def __init__(self, db: AsyncSession, image_service:ImageService):
+    def __init__(self, db: AsyncSession, image_service: ImageService):
         self.db = db
         self.image_service = image_service
 
@@ -103,22 +110,36 @@ class PropertyRepository:
 
             # 2. Flush to force PostgreSQL to safely generate new_property.id
             await self.db.flush()
-     
+
             final_photo_urls: list[str] = []
             if photo_urls:
-                public_ids = [self.image_service.extract_public_id_from_url(url) for url in photo_urls]
-                fake_property_id = self.image_service.extract_fake_id_from_public_id(public_ids[0], "properties")
-                
+                public_ids = [
+                    self.image_service.extract_public_id_from_url(url)
+                    for url in photo_urls
+                ]
+                fake_property_id = self.image_service.extract_fake_id_from_public_id(
+                    public_ids[0], "properties"
+                )
+
                 for old_public_id in public_ids:
-                    new_public_id = old_public_id.replace(fake_property_id, str(new_property.id))
+                    new_public_id = old_public_id.replace(
+                        fake_property_id, str(new_property.id)
+                    )
                     final_public_id = new_public_id.replace("temp/", "")
                     try:
-                        renamed = await self.image_service.provider.rename_image(old_public_id, final_public_id)
+                        renamed = await self.image_service.provider.rename_image(
+                            old_public_id, final_public_id
+                        )
                         final_photo_urls.append(renamed["url"])
                     except Exception as e:
-                        logger.error(f"[PropertyRepository] Failed to rename image {old_public_id}: {str(e)}")
-                        raise ImageStorageException("Failed to finalize property images", f"Failed to finalize property images{str(e)}")
-                        
+                        logger.error(
+                            f"[PropertyRepository] Failed to rename image {old_public_id}: {str(e)}"
+                        )
+                        raise ImageStorageException(
+                            "Failed to finalize property images",
+                            f"Failed to finalize property images{str(e)}",
+                        )
+
             # 3. Instantiate and stage the Hotel Details configuration
             hotel_detail = PropertyHotelDetail(
                 property_id=new_property.id,
@@ -222,6 +243,10 @@ class PropertyRepository:
                 "amenities": final_amenities,
                 "photo_urls": final_photos,
             }
+
+        except (InvalidImageException, ImageStorageException):
+            await self.db.rollback()
+            raise
 
         except DefaultAmenityNotExistsException as e:
             await self.db.rollback()
@@ -349,8 +374,6 @@ class PropertyRepository:
             for key, val in property_data.items():
                 setattr(existing_property, key, val)
 
-           
-
             # 3. Overwrite Hotel Details sub-record fields
             active_detail = None
             if hotel_detail_data is not None:
@@ -455,7 +478,7 @@ class PropertyRepository:
                     raise RepositoryException(
                         user_message="A property must have at least one valid photo.",
                         internal_message="A property must have at least one valid photo url",
-                        status_code=400
+                        status_code=400,
                     )
 
                 real_property_id = str(property_id)
@@ -463,10 +486,11 @@ class PropertyRepository:
 
                 for url in clean_photo_urls:
                     old_public_id = self.image_service.extract_public_id_from_url(url)
-                  
-                        
-                    current_folder_id = self.image_service.extract_fake_id_from_public_id(
-                        old_public_id, "properties"
+
+                    current_folder_id = (
+                        self.image_service.extract_fake_id_from_public_id(
+                            old_public_id, "properties"
+                        )
                     )
 
                     if current_folder_id == real_property_id:
@@ -475,7 +499,9 @@ class PropertyRepository:
                         continue
 
                     # Still under a fake id (uploaded fresh this edit session) — rename it
-                    new_public_id = old_public_id.replace(current_folder_id, real_property_id)
+                    new_public_id = old_public_id.replace(
+                        current_folder_id, real_property_id
+                    )
                     final_public_id = new_public_id.replace("temp/", "")
 
                     try:
@@ -493,7 +519,9 @@ class PropertyRepository:
                         )
 
                 await self.db.execute(
-                    delete(PropertyPhoto).where(PropertyPhoto.property_id == property_id)
+                    delete(PropertyPhoto).where(
+                        PropertyPhoto.property_id == property_id
+                    )
                 )
                 for url in final_photo_urls:
                     new_photo = PropertyPhoto(property_id=property_id, photo_url=url)
@@ -521,7 +549,13 @@ class PropertyRepository:
                 "photo_urls": updated_photos,
             }
 
-        except (PropertyNotFoundException,DefaultAmenityNotExistsException,ImageStorageException,RepositoryException):
+        except (
+            PropertyNotFoundException,
+            DefaultAmenityNotExistsException,
+            ImageStorageException,
+            RepositoryException,
+            InvalidImageException,
+        ):
             await self.db.rollback()
             raise
 
@@ -642,4 +676,102 @@ class PropertyRepository:
             logger.error(
                 f"[PropertyRepository] Error fetching image count for property {property_id}: {str(e)}"
             )
-            raise RepositoryException(f"Error fetching image count for property: {str(e)}")
+            raise RepositoryException(
+                f"Error fetching image count for property: {str(e)}"
+            )
+
+    async def get_available_properties(
+        self,
+        destination: str,
+        check_in: date,
+        check_out: date,
+        adults: int,
+        children: int,
+        room_count: int,
+    ):
+        logger.info(
+            f"[PropertyRepository] Fetching available properties for destination: {destination}, check-in: {check_in}, check-out: {check_out}, adults: {adults}, children: {children}, room count: {room_count}"
+        )
+        try:
+            # 1. Subquery: Extract room IDs actively booked
+            booked_rooms_subquery = (
+                select(BookingRoom.room_unit_id)
+                .join(Booking, BookingRoom.booking_id == Booking.id)
+                .where(
+                    and_(
+                        Booking.checkin_date < check_out,
+                        Booking.checkout_date > check_in,
+                        Booking.status != MasterBookingStatus.CANCELLED,
+                    )
+                )
+                .scalar_subquery()
+            )
+
+            # 2. Subquery: Fetch exactly ONE image url per property row
+            # Sorts by id or an order column if you have one, limiting output to 1 row
+            single_photo_subquery = (
+                select(PropertyPhoto.photo_url)
+                .where(PropertyPhoto.property_id == Property.id)
+                .order_by(PropertyPhoto.id)
+                .limit(1)
+                .scalar_subquery()
+            )
+
+            # 3. Text filters for destination matching
+            destination_wildcard = f"%{destination}%"
+            search_filter = or_(
+                func.lower(Property.name).like(destination_wildcard),
+                func.lower(Property.country).like(destination_wildcard),
+                func.lower(Property.state).like(destination_wildcard),
+                func.lower(Property.city).like(destination_wildcard),
+                func.lower(Property.address).like(destination_wildcard),
+            )
+
+            # 4. Complete structural query execution
+            stmt = (
+                select(
+                    Property.id.label("property_id"),
+                    Property.name.label("property_name"),
+                    func.min(Rooms.base_rate).label("lowest_price"),
+                    Property.address,
+                    Property.city,
+                    Property.state,
+                    Property.country,
+                    single_photo_subquery.label("photo_url"),
+                )
+                .join(Property.hotel_detail)
+                .join(PropertyHotelDetail.rooms)
+                .where(
+                    and_(
+                        Property.is_active == True,
+                        search_filter,
+                        Rooms.max_adults >= adults,
+                        Rooms.max_children >= children,
+                        not_(Rooms.id.in_(booked_rooms_subquery)),
+                    )
+                )
+                .group_by(
+                    Property.id,
+                    Property.name,
+                    Property.address,
+                    Property.city,
+                    Property.state,
+                    Property.country,
+                )
+                .having(func.count(Rooms.id) >= room_count)
+            )
+            result = await self.db.execute(stmt)
+            available_properties = result.all()
+            logger.info(
+                f"[PropertyRepository] Found {len(available_properties)} available properties"
+            )
+
+            return available_properties
+        except Exception as e:
+            logger.error(
+                f"[PropertyRepository] Error fetching available properties: {str(e)}"
+            )
+            raise RepositoryException(
+                "Error fetching available properties",
+                f"Error fetching available properties: {str(e)}",
+            )

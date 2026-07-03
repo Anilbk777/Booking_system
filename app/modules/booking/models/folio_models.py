@@ -1,11 +1,11 @@
 
 from app.config.database_config import Base
-from sqlalchemy import String, ForeignKey, Numeric,  DateTime, CheckConstraint, Enum as SqlEnum
+from sqlalchemy import String, ForeignKey, Numeric,  DateTime, CheckConstraint, Enum as SqlEnum,UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
-from uuid import UUID
+import uuid
 from enum import StrEnum
 from app.utils.timestamp import TimestampMixin
 
@@ -25,7 +25,7 @@ class Folio(Base, TimestampMixin):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     booking_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("bookings.id", ondelete="RESTRICT"), index=True, nullable=False)
-    guest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="PROTECT"), index=True, nullable=False)
+    guest_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), index=True, nullable=False)
     
     status: Mapped[FolioStatus] = mapped_column(SqlEnum(FolioStatus, native_enum=False, length=20), default=FolioStatus.OPEN, nullable=False)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0.00, nullable=False)

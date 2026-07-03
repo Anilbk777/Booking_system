@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException,  status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.modules.auth.auth_middlewares import CurrentUser
 from app.modules.pms.dependencies import get_property_service
@@ -12,6 +12,8 @@ from app.modules.pms.schemas.properties_schemas import (
     PropertyResponse,
     PropertyDetailResponse,
     DefaultAmenityResponse,
+    PropertySearchResponse,
+    PropertySearchQueryParams,
 )
 from app.modules.pms.services.properties_scervices import PropertyService
 from app.utils.schemas import StandardResponse
@@ -123,6 +125,19 @@ async def get_all_amenities(
             detail="You are not authorized to get a amenities.",
         )
     response = await property_service.get_all_amenities()
+    return {"success": True, "data": response}
+
+
+@router.get(
+    "/search",
+    response_model=StandardResponse[list[PropertySearchResponse]],
+    status_code=status.HTTP_200_OK,
+)
+async def search_properties(
+    params: PropertySearchQueryParams = Depends(),
+    property_service: PropertyService = Depends(get_property_service),
+):
+    response = await property_service.search_properties(params)
     return {"success": True, "data": response}
 
 
@@ -251,11 +266,14 @@ async def update_property_activation(
             detail="You are not authorized to update a property.",
         )
 
-    await property_service.update_property_activation(
+    response = await property_service.update_property_activation(
         property_id, current_user.tenant_id
     )
 
-    return {"success": True, "data": "Property is activated"}
+    return {
+        "success": True,
+        "data": f"Property is {'active' if response.is_active else 'inactive'}",
+    }
 
 
 @router.delete("/{property_id}")
