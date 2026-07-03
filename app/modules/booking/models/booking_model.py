@@ -4,9 +4,10 @@ from datetime import date
 from decimal import Decimal
 from typing import List
 
-from sqlalchemy import ForeignKey, String, Integer, Numeric, Date,  CheckConstraint, Enum as SqlEnum
+from sqlalchemy import ForeignKey, String, Integer, Numeric, Date,  CheckConstraint, Enum as SqlEnum, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.utils.timestamp import TimestampMixin
+from app.config.database import Base
 
 class MasterBookingStatus(StrEnum):
     PENDING = "PENDING"

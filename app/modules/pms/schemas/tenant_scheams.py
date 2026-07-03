@@ -15,9 +15,10 @@ from datetime import datetime
 
 class TenantBase(BaseModel):
     name: str = Field(
-        Annotated[
-            str, StringConstraints(min_length=2, max_length=255, strip_whitespace=True)
-        ],
+        ...,  
+        min_length=2,
+        max_length=255,
+        strip_whitespace=True,
         title="Tenant Name",
         description="Name of the tenant",
     )
