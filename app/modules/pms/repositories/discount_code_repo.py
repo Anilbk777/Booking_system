@@ -2,9 +2,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select, func, delete
 from app.modules.pms.models.discount_code_model import DiscountCode
 from app.utils.logging import LoggerFactory
-from app.utils.exceptions import RepositoryException
+from app.utils.exceptions import RepositoryException,DiscountCodeDuplicateException
 import uuid
 from typing import Any
+from sqlalchemy.exc import IntegrityError
 
 logger = LoggerFactory.get_logger(__name__)
 class DiscountCodeRepository:
@@ -97,7 +98,7 @@ class DiscountCodeRepository:
             return db_discount
         except IntegrityError as e:
             logger.error(f"[DiscountCodeRepository] Uniqueness conflict on update: {str(e)}")
-            raise DiscountCodeDuplicateException("A discount code with this name already exists for this property.", str(e))
+            raise DiscountCodeDuplicateException("A discount code with this name already exists for this property."))
         except Exception as e:
             logger.error(f"[DiscountCodeRepository] Unexpected update failure: {str(e)}")
             raise RepositoryException("Failed to update database discount code record", str(e))

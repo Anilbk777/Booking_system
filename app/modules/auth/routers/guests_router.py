@@ -63,7 +63,7 @@ async def refresh_token(
 
 
 @router.get("/me", response_model=GuestResponse, status_code=status.HTTP_200_OK)
-async def get_current_user(
+async def get_current_guest(
     guest: CurrentGuest,
 ):
     return guest
