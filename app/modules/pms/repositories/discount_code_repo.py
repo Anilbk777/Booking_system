@@ -56,7 +56,7 @@ class DiscountCodeRepository:
             )
 
     async def create_discount_code(self,discount_code:dict) -> DiscountCode:
-        logger.info(f"[DiscountCodeRepository] Creating discount code")
+        logger.info("[DiscountCodeRepository] Creating discount code")
         
         try:
             new_discount_code = DiscountCode(**discount_code)
