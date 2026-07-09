@@ -25,7 +25,7 @@ class UserBase(BaseModel):
         value = value.strip()
         if not re.match(r"^[a-zA-Z\s]+$", value):
             raise ValueError("Name must contain only alphabetic characters and spaces")
-        return value
+        
 
     @field_validator("email", mode="before")
     @classmethod
@@ -54,7 +54,12 @@ class UserCreate(UserBase):
         if not special_char_regex.search(value):
             raise ValueError("Password must contain at least one special character.")
 
-        return value.strip()
+        # password should not include the spaces in between or before or after
+        value = value.strip()
+        if " " in value:
+            raise ValueError("Password must not contain spaces between the words.")
+
+        return value
 
 
 class UserResponse(UserBase):

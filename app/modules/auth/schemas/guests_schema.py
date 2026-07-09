@@ -66,6 +66,10 @@ class GuestCreate(GuestBase):
         if not special_char_regex.search(value):
             raise ValueError("Password must contain at least one special character.")
 
+        value = value.strip()
+        if " " in value:
+            raise ValueError("Password must not contain spaces between the words.")
+
         return value
 
 

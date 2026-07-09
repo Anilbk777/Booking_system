@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from enum import StrEnum
 from typing import List, Optional
 
 from sqlalchemy import (
@@ -10,25 +9,10 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy import (
-    Enum as SqlEnum,
-)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.config.database_config import Base
-
-
-class Plan(StrEnum):
-    FREE = "FREE"
-    PREMIUM = "PREMIUM"
-    ENTERPRISE = "ENTERPRISE"
-
-
-class Status(StrEnum):
-    ACTIVE = "ACTIVE"
-    INACTIVE = "INACTIVE"
-    SUSPENDED = "SUSPENDED"
 
 
 class Tenant(Base):
@@ -48,18 +32,7 @@ class Tenant(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    plan: Mapped[Plan] = mapped_column(SqlEnum(Plan), default=Plan.FREE, nullable=False)
-    status: Mapped[Status] = mapped_column(
-        SqlEnum(Status), default=Status.ACTIVE, nullable=False
-    )
-    custom_domain: Mapped[Optional[str]] = mapped_column(
-        String(255), unique=True, nullable=True
-    )
-    logo_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
-    currency: Mapped[Optional[str]] = mapped_column(
-        String(3), default="USD", nullable=False
-    )
-    timezone: Mapped[str] = mapped_column(String(100), default="UTC", nullable=False)
+ 
     # Both timestamps use server_default so DB clock is the single source of truth
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

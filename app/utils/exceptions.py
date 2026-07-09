@@ -134,10 +134,10 @@ class TenantNotFoundException(AppBaseException):
 class PropertyAlreadyExistsException(AppBaseException):
     """Raised when a property with the same name already exists."""
 
-    def __init__(self, internal_detail: str = None):
+    def __init__(self, user_message: str):
         super().__init__(
-            user_message="Property with this name already exists",
-            internal_detail=internal_detail,
+            user_message=user_message,
+            internal_detail=user_message,
             status_code=400,
         )
 
