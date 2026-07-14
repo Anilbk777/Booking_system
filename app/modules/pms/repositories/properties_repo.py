@@ -282,3 +282,16 @@ class PropertyRepository:
         total_count = count_result.scalar_one()
 
         return properties, total_count 
+
+    async def get_all_system_amenities(self) -> Sequence[Amenity]:
+        """
+        Fetches the complete catalog of master system amenities from the database.
+        """
+        logger.info("[AmenityRepository] Fetching full master system amenities catalog")
+        try:
+            stmt = select(Amenity).order_by(Amenity.name.asc())
+            result = await self.db.execute(stmt)
+            return result.scalars().all()
+        except Exception as e:
+            logger.error(f"[AmenityRepository] Failed to fetch system amenities: {str(e)}")
+            raise RepositoryException(f"Failed to load system master options: {str(e)}")

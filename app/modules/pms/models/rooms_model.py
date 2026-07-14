@@ -78,7 +78,7 @@ class Rooms(Base, TimestampMixin):
         nullable=False,
     )
     floor_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    room_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    room_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     max_adults: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
     max_children: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     base_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)

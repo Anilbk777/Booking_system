@@ -23,6 +23,7 @@ from app.utils.exceptions import (
 )
 from app.utils.logging import LoggerFactory
 import psycopg.errors
+from typing import Sequence
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -61,12 +62,22 @@ class RoomRepository:
                 for room in rooms_data
             ]
             self.db.add_all(rooms)
-            await self.db.flush()
+            await self.db.flush() 
 
-            for room in rooms:
-                await self.db.refresh(room)
+            room_ids = [room.id for room in rooms]
+        
+            await self.db.commit()
 
-            return rooms
+            stmt = (
+                select(Rooms)
+                .where(Rooms.id.in_(room_ids))
+                .options(
+                    joinedload(Rooms.room_type),
+                    joinedload(Rooms.bed_type)
+                )
+            )
+            result = await self.db.execute(stmt)
+            return result.scalars().all()
      
         except IntegrityError as e:
             await self.db.rollback()
@@ -202,3 +213,98 @@ class RoomRepository:
                 f"[RoomRepository] Unexpected error creating bed type: {str(e)}"
             )
             raise RepositoryException(f"Failed to create bed type: {str(e)}")
+
+    async def get_existing_room_names(self, property_id: uuid.UUID, room_names: list[str]):
+
+        logger.info(f"[RoomRepository] getting all the room names for the property {property_id} and room names {room_names}")
+        try:
+            lower_room_names = [name.lower() for name in room_names]
+
+            stmt = select(Rooms).where(
+                Rooms.property_id == property_id,
+                func.lower(Rooms.room_name).in_(lower_room_names)
+            )
+        
+            result = await self.db.execute(stmt)
+            return result.scalars().all()
+        except Exception as e:
+            logger.error(
+                f"[RoomRepository] Unexpected error getting room names: {str(e)}"
+            )
+            raise RepositoryException(f"Failed to get room names: {str(e)}")
+    
+    async def get_all_rooms(self, property_id: uuid.UUID) -> Sequence[Rooms]:
+        """Get all rooms for a property, including room types and bed types."""
+        logger.info(f"[RoomRepository] Getting all rooms for property {property_id}")
+        try:
+            stmt = (
+            select(Rooms)
+            .where(Rooms.property_id == property_id)
+            .options(
+                joinedload(Rooms.room_type),
+                joinedload(Rooms.bed_type)
+                )
+            )
+        
+            result = await self.db.execute(stmt)
+            rooms = result.scalars().all()
+            
+            logger.info(f"[RoomRepository] Found {len(rooms)} rooms for property {property_id}")
+            return rooms
+        except Exception as e:
+            logger.error(
+                f"[RoomRepository] Unexpected error getting rooms: {str(e)}"
+            )
+            raise RepositoryException(f"Failed to get rooms: {str(e)}")
+
+    async def get_all_room_types(self, property_id: uuid.UUID) -> Sequence[RoomType]:
+        """Get all room types for a property."""
+        logger.info(f"[RoomRepository] Getting all room types for property {property_id}")
+        try:
+            stmt = (
+                select(RoomType)
+                .where(
+                    or_(
+                        RoomType.property_id == property_id,
+                        RoomType.property_id.is_(None)
+                    )
+                )
+                # Optional: Order by defaults first, then alphabetically by name
+                .order_by(RoomType.is_default.desc(), RoomType.room_type_name.asc())
+            )
+            result = await self.db.execute(stmt)
+            room_types = result.scalars().all()
+            
+            logger.info(f"[RoomRepository] Found {len(room_types)} total room types for property {property_id}")
+            return room_types
+        except Exception as e:
+            logger.error(
+                f"[RoomRepository] Unexpected error getting room types: {str(e)}"
+            )
+            raise RepositoryException(f"Failed to get room types: {str(e)}")
+    
+    async def get_all_bed_types(self, property_id: uuid.UUID) -> Sequence[BedType]:
+        """Get all bed types for a property."""
+        logger.info(f"[RoomRepository] Getting all bed types for property {property_id}")
+        try:
+            stmt = (
+                select(BedType)
+                .where(
+                    or_(
+                        BedType.property_id == property_id,
+                        BedType.property_id.is_(None)
+                )
+            )
+                # Optional: Order by defaults first, then alphabetically by name
+                .order_by(BedType.is_default.desc(), BedType.bed_name.asc())
+            )
+            result = await self.db.execute(stmt)
+            bed_types = result.scalars().all()
+            
+            logger.info(f"[RoomRepository] Found {len(bed_types)} total bed types for property {property_id}")
+            return bed_types
+        except Exception as e:
+            logger.error(
+                f"[RoomRepository] Unexpected error getting bed types: {str(e)}"
+            )
+            raise RepositoryException(f"Failed to get bed types: {str(e)}")

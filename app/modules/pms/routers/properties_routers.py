@@ -16,6 +16,8 @@ from app.modules.pms.schemas.properties_schemas import (
    BrandVisual,
    BrandVisualResponse,
    TenantPropertiesListResponse,
+   SystemAmenitiesListResponse,
+   
 )
 from app.modules.pms.services.properties_scervices import PropertyService
 from app.utils.schemas import StandardResponse
@@ -40,6 +42,15 @@ async def get_tenant_properties(
     tenant_id=current_user.tenant_id
     response = await property_service.get_tenant_properties_list(tenant_id,skip,limit)
     return {"success": True, "data": response}
+
+
+@router.get("/amenities",status_code=status.HTTP_200_OK,response_model=StandardResponse[SystemAmenitiesListResponse])
+async def get_amenities(current_user:CurrentUser,property_service:PropertyService = Depends(get_property_service)):
+    verify_tenant(current_user)
+    tenant_id=current_user.tenant_id
+    response = await property_service.get_all_system_amenities()
+    return {"success": True, "data": response}
+
 
 @router.post(
     "/general-information",

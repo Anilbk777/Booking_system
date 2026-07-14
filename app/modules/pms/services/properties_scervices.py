@@ -3,10 +3,7 @@ import uuid
 
 from app.modules.pms.repositories.properties_repo import PropertyRepository
 from app.modules.pms.schemas.properties_schemas import (
-    # PropertyCreate,
-    # DefaultAmenityResponse,
-    # PropertySearchQueryParams,
-    # PropertySearchResponse,
+
     GeneralPropertyInfo,
     GeneralPropertyInfoResponse,
     Location,
@@ -19,6 +16,8 @@ from app.modules.pms.schemas.properties_schemas import (
     BrandVisualResponse,
     PropertyResponse,
     TenantPropertiesListResponse,
+    SystemAmenityResponse,
+    SystemAmenitiesListResponse
 )
 from app.utils.exceptions import (
     PropertyAlreadyExistsException,
@@ -185,3 +184,15 @@ class PropertyService:
             total_count=total_count,
             properties=[PropertyResponse.model_validate(p) for p in properties]
         )
+
+    async def get_all_system_amenities(self):
+        logger.info("[PropertyService] getting all system amenities")
+        try:
+            amenities = await self.property_repo.get_all_system_amenities()
+            return SystemAmenitiesListResponse(
+                total_count=len(amenities),
+                amenities=[SystemAmenityResponse.model_validate(a) for a in amenities]
+            )
+        except Exception as e:
+            logger.error(f"[PropertyService] Error getting all system amenities: {str(e)}")
+            raise ServiceException(internal_detail=f"Failed to get all system amenities: {str(e)}")

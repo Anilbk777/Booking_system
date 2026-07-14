@@ -77,6 +77,12 @@ class RoomService:
             rooms_data = payload_dict["rooms"]
             logger.info(f"[RoomService] Rooms data: {rooms_data}")
 
+            room_names = [room['room_name'] for room in rooms_data]
+            existing_room_names = await self.room_repo.get_existing_room_names(
+                property_id, room_names
+            )
+            if existing_room_names:
+                raise RoomNameAlreadyExistsException(f"Room name(s) already exists: {[room.room_name for room in existing_room_names]}")
             created_rooms = await self.room_repo.create_rooms(property_obj.id, rooms_data) 
             return RoomBulkCreateResponse(
                 rooms=[
@@ -130,3 +136,47 @@ class RoomService:
         except Exception as e:
             logger.error(f"[RoomService] Error executing bed type creation: {str(e)}")
             raise ServiceException(str(e))
+
+
+    async def get_all_rooms(self, property_id:uuid.UUID, tenant_id:uuid.UUID) -> list[RoomResponse]:
+        logger.info(f"[RoomService] Getting all rooms for property {property_id}")
+        try:
+            property_obj = await self._validate_property(property_id, tenant_id)
+            rooms = await self.room_repo.get_all_rooms(property_id)
+            logger.info(f"[RoomService] Found {len(rooms)} rooms for property {property_id}")
+            return [RoomResponse.model_validate(room) for room in rooms]
+
+        except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
+            raise
+
+        except Exception as e:
+            logger.error(f"[RoomService] Error executing get all rooms: {str(e)}")
+            raise ServiceException(str(e))    
+
+
+    async def get_all_room_types(self, property_id:uuid.UUID, tenant_id:uuid.UUID) -> list[RoomTypeResponse]:
+        logger.info(f"[RoomService] getting room types for property {property_id}")
+        try:
+            property_obj = await self._validate_property(property_id, tenant_id)
+            room_types = await self.room_repo.get_all_room_types(property_id)
+            logger.info(f"[RoomService] Found {len(room_types)} room types for property {property_id}")
+            return [RoomTypeResponse.model_validate(room_type) for room_type in room_types]
+
+        except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[RoomService] Error executing get all room types: {str(e)}")
+            raise ServiceException(str(e)) 
+
+    async def get_all_bed_types(self,property_id:uuid.UUID, tenant_id:uuid.UUID) -> list[BedTypeResponse]:
+        logger.info(f"[RoomService] getting bed types for property {property_id}")
+        try:
+            property_obj = await self._validate_property(property_id, tenant_id)
+            bed_types = await self.room_repo.get_all_bed_types(property_id)
+            logger.info(f"[RoomService] Found {len(bed_types)} bed types for property {property_id}")
+            return [BedTypeResponse.model_validate(bed_type) for bed_type in bed_types]
+        except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[RoomService] Error executing get all bed types: {str(e)}")
+            raise ServiceException(str(e)) 

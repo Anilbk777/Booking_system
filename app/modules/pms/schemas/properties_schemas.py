@@ -400,3 +400,15 @@ class TenantPropertiesListResponse(BaseModel):
     tenant_id: uuid.UUID
     total_count: int
     properties: List[PropertyResponse]
+
+
+class SystemAmenityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: uuid.UUID
+    name: str = Field(..., max_length=100, description="The master amenity name")
+    icon: Optional[str] = Field(None, max_length=100, description="The UI icon slug string")
+
+class SystemAmenitiesListResponse(BaseModel):
+    total_count: int
+    amenities: List[SystemAmenityResponse]
