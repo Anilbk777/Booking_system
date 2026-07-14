@@ -17,12 +17,11 @@ class RepositoryException(AppBaseException):
 
     def __init__(
         self,
-        user_message: str = "A database error occurred. Please try again later.",
         internal_detail: str = None,
         status_code: int = 500,
     ):
         super().__init__(
-            user_message=user_message,
+            user_message="A database error occurred. Please try again later.",
             internal_detail=internal_detail,
             status_code=status_code,
         )
@@ -33,12 +32,11 @@ class ServiceException(AppBaseException):
 
     def __init__(
         self,
-        user_message: str = "An internal error occurred while processing your request.",
         internal_detail: str = None,
         status_code: int = 500,
     ):
         super().__init__(
-            user_message=user_message,
+            user_message="An internal error occurred while processing your request.",
             internal_detail=internal_detail,
             status_code=status_code,
         )
@@ -203,9 +201,9 @@ class DefaultAmenityNotExistsException(AppBaseException):
 
 
 class AmenityNotFoundException(AppBaseException):
-    def __init__(self, user_message: str):
+    def __init__(self, user_message: str, internal_detail: str = None):
         super().__init__(
-            user_message=user_message, internal_detail=user_message, status_code=404
+            user_message=user_message, internal_detail=internal_detail, status_code=404
         )
 
 
@@ -237,6 +235,21 @@ class RoomNotFoundException(AppBaseException):
             status_code=404,
         )
 
+class RoomTypeAlreadyExistsException(AppBaseException):
+    def __init__(self, user_message, status_code=400):
+        super().__init__(
+            user_message=user_message,
+            internal_detail=user_message,
+            status_code=status_code,
+        )
+
+class BedTypeAlreadyExistsException(AppBaseException):
+    def __init__(self, user_message, status_code=400):
+        super().__init__(
+            user_message=user_message,
+            internal_detail=user_message,
+            status_code=status_code,
+        )
 
 class InvalidDateException(AppBaseException):
     def __init__(self, user_message, status_code=400):

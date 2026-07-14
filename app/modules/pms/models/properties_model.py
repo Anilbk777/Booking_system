@@ -8,7 +8,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from enum import StrEnum
 from app.utils.timestamp import TimestampMixin
 from app.config.database_config import Base
 
@@ -78,17 +78,20 @@ class Property(Base, TimestampMixin):
         Numeric(precision=9, scale=6), nullable=True
     )
 
-    check_in_time: Mapped[str] = mapped_column(String(20), nullable=True)
-    check_out_time: Mapped[str] = mapped_column(String(20), nullable=True)
-    check_in_grace_period: Mapped[int] = mapped_column(
+    check_in_time: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    check_out_time: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    check_in_grace_period: Mapped[Optional[int]] = mapped_column(
         Integer, default=0, nullable=True
     )
-    check_out_grace_period: Mapped[int] = mapped_column(
+    check_out_grace_period: Mapped[Optional[int]] = mapped_column(
         Integer, default=0, nullable=True
     )
+    always_allow_check_in_out :Mapped[bool] = mapped_column(Boolean, default=False)
     number_of_floors: Mapped[int] = mapped_column(Integer, default=1, nullable=True)
     total_rooms: Mapped[int] = mapped_column(Integer, default=1, nullable=True)
     year_built: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     currency: Mapped[str] = mapped_column(String(3), default="USD", nullable=True)
     timezone: Mapped[str] = mapped_column(String(100), default="UTC", nullable=True)
@@ -121,9 +124,9 @@ class Property(Base, TimestampMixin):
     bed_types:Mapped[List["BedType"]] = relationship("BedType",back_populates="property",cascade="all,delete-orphan",passive_deletes=True,)
     room_types:Mapped[List["RoomType"]] = relationship("RoomType",back_populates="property",cascade="all,delete-orphan",passive_deletes=True,)
     
-    special_offers: Mapped[List["SpecialOffer"]] = relationship(
-        "SpecialOffer", back_populates="property", cascade="all, delete-orphan", passive_deletes=True
-    )
+    # special_offers: Mapped[List["SpecialOffer"]] = relationship(
+    #     "SpecialOffer", back_populates="property", cascade="all, delete-orphan", passive_deletes=True
+    # )
 
 
 class Amenity(Base, TimestampMixin):

@@ -17,6 +17,8 @@ from app.modules.pms.schemas.properties_schemas import (
     PropertylocalizationResponse,
     BrandVisual,
     BrandVisualResponse,
+    PropertyResponse,
+    TenantPropertiesListResponse,
 )
 from app.utils.exceptions import (
     PropertyAlreadyExistsException,
@@ -28,6 +30,8 @@ from app.utils.exceptions import (
     InvalidDateException,
     InvalidImageException,
     ImageStorageException,
+    AmenityNotFoundException,
+    ResourceConflictException,
 )
 from app.utils.logging import LoggerFactory
 
@@ -49,257 +53,135 @@ class PropertyService:
 
             response = await self.property_repo.create_general_information(payload_dict,tenant_id)
             
-            return GeneralPropertyInfoResponse(**response)
+            return GeneralPropertyInfoResponse.model_validate(response)
 
         except (PropertyAlreadyExistsException , RepositoryException):
             raise
         except Exception as e:
             logger.error(f"[PropertyService] Error creating general information: {str(e)}")
             raise ServiceException(internal_detail=f"Failed to create general information of property :{str(e)}")
-            
-            
 
-            
+    async def create_location(self, property_id: uuid.UUID, payload: Location, tenant_id: uuid.UUID) -> LocationResponse:
+        logger.info(f"[PropertyService] creating location for property {property_id}")
+        payload_dict = payload.model_dump()
+        try:
+            property_obj = await self.property_repo.create_location(property_id, tenant_id, payload_dict)
+            return LocationResponse.model_validate(property_obj)
+        except (PropertyNotFoundException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error updating location: {str(e)}")
+            raise ServiceException(internal_detail=f"Failed to update location for property: {str(e)}")
+
+    async def create_photos_and_amenities(
+        self,
+        property_id: uuid.UUID,
+        payload: PropertyPhotosAndAmenities,
+        tenant_id: uuid.UUID,
+    ) -> PropertyPhotosAndAmenitiesResponse:
+        logger.info(f"[PropertyService] creating photos and amenities for property {property_id}")
+        payload_dict = payload.model_dump()
+
+        try:
+            amenities_data = payload_dict.get("amenities", {})
+            system_ids = amenities_data.get("system_amenity_ids", [])
+            custom_amenities = amenities_data.get("custom_amenities", [])
+
+            # ── Rule 1: Validate system amenity IDs exist in DB ─────────────
+            # validate_amenities returns the set of system amenity names (lowercase)
+            system_names = await self.property_repo.validate_amenities(system_ids, custom_amenities)
+
+            # ── Rule 2: Duplicate custom amenity names within the request ───
+            custom_names_lower = [c["name"].lower() for c in custom_amenities]
+            seen: set[str] = set()
+            duplicates: list[str] = []
+            for name in custom_names_lower:
+                if name in seen:
+                    duplicates.append(name)
+                seen.add(name)
+
+            if duplicates:
+                dup_str = ", ".join(sorted(set(duplicates)))
+                raise ResourceConflictException(
+                    f"Duplicate custom amenity names are not allowed: {dup_str}"
+                )
+
+            # ── Rule 3: Custom amenity name must not match a system amenity ─
+            conflicts = [c["name"] for c in custom_amenities if c["name"].lower() in system_names]
+            if conflicts:
+                conflict_str = ", ".join(conflicts)
+                raise ResourceConflictException(
+                    f"These custom amenity names already exist as system amenities: {conflict_str}"
+                )
+
+            # ── Rule 4: Custom amenity name must not already exist on the property ─
+            existing_property = await self.property_repo.get_property_by_id(property_id, tenant_id)
+            if not existing_property:
+                raise PropertyNotFoundException("Property not found or access denied")
+
+            existing_custom = existing_property.custom_amenities or []
+            existing_custom_names = {item["name"].lower() for item in existing_custom}
+
+            already_exists = [
+                c["name"] for c in custom_amenities
+                if c["name"].lower() in existing_custom_names
+            ]
+            if already_exists:
+                conflict_str = ", ".join(already_exists)
+                raise ResourceConflictException(
+                    f"These custom amenities already exist for this property: {conflict_str}"
+                )
+
+            # ── All checks passed — persist to DB ───────────────────────────
+            property_obj = await self.property_repo.create_photos_and_amenities(
+                property_id, tenant_id, payload_dict
+            )
+            return PropertyPhotosAndAmenitiesResponse.model_validate(property_obj)
+
+        except (PropertyNotFoundException, RepositoryException, AmenityNotFoundException, ResourceConflictException):
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error updating photos and amenities: {str(e)}")
+            raise ServiceException(internal_detail=f"Failed to update photos and amenities for property: {str(e)}")
+
+    async def create_localization(self, property_id: uuid.UUID, payload: Propertylocalization, tenant_id: uuid.UUID) -> PropertylocalizationResponse:
+        logger.info(f"[PropertyService] creating localization for property {property_id}")
+        payload_dict = payload.model_dump()
+        try:
+            property_obj = await self.property_repo.create_localization(property_id, tenant_id, payload_dict)
+            return PropertylocalizationResponse.model_validate(property_obj)
+        except (PropertyNotFoundException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error updating localization: {str(e)}")
+            raise ServiceException(internal_detail=f"Failed to update localization for property: {str(e)}")
+
+    async def create_brand_visual(self, property_id: uuid.UUID, payload: BrandVisual, tenant_id: uuid.UUID) -> BrandVisualResponse:
+        logger.info(f"[PropertyService] creating brand visual for property {property_id}")
+        payload_dict = payload.model_dump()
+        try:
+            property_obj = await self.property_repo.create_brand_visual(property_id, tenant_id, payload_dict)
+            return BrandVisualResponse.model_validate(property_obj)
+        except (PropertyNotFoundException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error updating brand visual: {str(e)}")
+            raise ServiceException(internal_detail=f"Failed to update brand visual for property: {str(e)}")
 
 
+    async def get_tenant_properties_list(
+        self, tenant_id: uuid.UUID, skip: int = 0, limit: int = 100
+    ) -> TenantPropertiesListResponse:
+        """
+        Retrieves properties and structures them into the TenantPropertiesListResponse Pydantic schema.
+        """
+        properties, total_count = await self.property_repo.get_properties_by_tenant(
+            tenant_id=tenant_id, skip=skip, limit=limit
+        )
 
-
-
-
-    # async def create_property(self, payload: PropertyCreate, tenant_id: uuid.UUID):
-    #     logger.info(f"[PropertyService] Creating property: {payload}")
-    #     # 1. Convert Pydantic payload to clean dictionary mappings
-    #     payload_dict = payload.model_dump()
-
-    #     # 2. Extract nested relational segments to keep the base dictionary clean
-    #     hotel_detail_data = payload_dict.pop("hotel_detail")
-    #     amenities_input = payload_dict.pop("amenities")
-    #     photo_urls_data = payload_dict.pop("photo_urls")
-
-    #     # Check if property already exists
-    #     existing_property = await self.property_repository.get_property_by_name(
-    #         payload_dict["name"], tenant_id
-    #     )
-    #     if existing_property:
-    #         logger.error(
-    #             f"[PropertyService] Property with name {payload_dict['name']} already exists"
-    #         )
-    #         raise PropertyAlreadyExistsException(
-    #             f"Property with name {payload_dict['name']} already exists"
-    #         )
-
-    #     try:
-    #         return await self.property_repository.create_property_transactional(
-    #             tenant_id=tenant_id,
-    #             property_data=payload_dict,
-    #             hotel_detail_data=hotel_detail_data,
-    #             amenities_input=amenities_input,
-    #             photo_urls=photo_urls_data,
-    #         )
-
-    #     except (
-    #         RepositoryException,
-    #         DefaultAmenityNotExistsException,
-    #         InvalidImageException,
-    #         ImageStorageException,
-    #     ):
-    #         raise
-
-    #     except Exception as e:
-    #         logger.error(f"[PropertyService] Error creating property: {str(e)}")
-    #         raise ServiceException(str(e))
-
-    # async def get_all_properties(self, tenant_id: uuid.UUID):
-    #     logger.info(f"[PropertyService] Getting all properties for tenant: {tenant_id}")
-    #     try:
-    #         return await self.property_repository.get_all_properties(tenant_id)
-    #     except RepositoryException:
-    #         raise
-    #     except Exception as e:
-    #         logger.error(f"[PropertyService] Error getting all properties: {str(e)}")
-    #         raise ServiceException(str(e))
-
-    # async def get_property_details_by_id(
-    #     self, property_id: uuid.UUID, tenant_id: uuid.UUID
-    # ):
-    #     logger.info(f"[PropertyService] Getting property details by id: {property_id}")
-
-    #     existing_property = await self.property_repository.get_property_by_id(
-    #         property_id, tenant_id
-    #     )
-    #     if not existing_property:
-    #         logger.error(f"[PropertyService] Property with id {property_id} not found")
-    #         raise PropertyNotFoundException(f"Property with id {property_id} not found")
-
-    #     try:
-    #         return await self.property_repository.get_property_details_by_id(
-    #             property_id, tenant_id
-    #         )
-    #     except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
-    #         raise
-    #     except Exception as e:
-    #         logger.error(
-    #             f"[PropertyService] Error getting property details by id: {str(e)}"
-    #         )
-    #         raise ServiceException(str(e))
-
-    # async def update_property(
-    #     self, property_id: uuid.UUID, tenant_id: uuid.UUID, payload: PropertyCreate
-    # ):
-    #     logger.info(f"[PropertyService] Updating property: {property_id}")
-
-    #     # 1. Convert Pydantic payload to clean dictionary mappings
-    #     payload_dict = payload.model_dump()
-
-    #     # 2. Extract nested relational segments to keep the base dictionary clean
-    #     hotel_detail_data = payload_dict.pop("hotel_detail")
-    #     amenities_input = payload_dict.pop("amenities")
-    #     photo_urls_data = payload_dict.pop("photo_urls")
-
-    #     # Check if property already exists
-    #     existing_property = await self.property_repository.get_property_by_name(
-    #         payload_dict["name"], tenant_id
-    #     )
-    #     if existing_property and existing_property.id != property_id:
-    #         logger.error(
-    #             f"[PropertyService] Property with name {payload_dict['name']} already exists"
-    #         )
-    #         raise PropertyAlreadyExistsException(
-    #             f"Property with name {payload_dict['name']} already exists"
-    #         )
-
-    #     try:
-    #         return await self.property_repository.update_property(
-    #             property_id,
-    #             tenant_id,
-    #             payload_dict,
-    #             hotel_detail_data,
-    #             amenities_input,
-    #             photo_urls_data,
-    #         )
-    #     except (
-    #         PropertyNotFoundException,
-    #         PropertyAlreadyExistsException,
-    #         UnauthorizedException,
-    #         RepositoryException,
-    #         InvalidImageException,
-    #         ImageStorageException,
-    #     ):
-    #         raise
-    #     except Exception as e:
-    #         logger.error(f"[PropertyService] Error updating property: {str(e)}")
-    #         raise ServiceException(str(e))
-
-    # async def update_property_activation(
-    #     self, property_id: uuid.UUID, tenant_id: uuid.UUID
-    # ):
-    #     logger.info(f"[PropertyService] Updating property activation: {property_id}")
-
-    #     property_obj = await self.get_property_details_by_id(property_id, tenant_id)
-    #     if not property_obj:
-    #         logger.error(f"[PropertyService] Property with id {property_id} not found")
-    #         raise PropertyNotFoundException(f"Property with id {property_id} not found")
-    #     try:
-    #         value = await self.property_repository.update_property_activation(
-    #             property_id, tenant_id
-    #         )
-    #         if not value:
-    #             logger.error("[PropertyService] Error updating property activation")
-    #             raise ServiceException("Error updating property activation")
-    #         return value
-
-    #     except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
-    #         raise
-    #     except Exception as e:
-    #         logger.error(
-    #             f"[PropertyService] Error updating property activation: {str(e)}"
-    #         )
-    #         raise ServiceException(str(e))
-
-    # async def delete_property(self, property_id: uuid.UUID, tenant_id: uuid.UUID):
-    #     logger.info(f"[PropertyService] Deleting property: {property_id}")
-
-    #     property_obj = await self.get_property_details_by_id(property_id, tenant_id)
-    #     if not property_obj:
-    #         logger.error(f"[PropertyService] Property with id {property_id} not found")
-    #         raise PropertyNotFoundException(f"Property with id {property_id} not found")
-    #     try:
-    #         return await self.property_repository.delete_property(
-    #             property_id, tenant_id
-    #         )
-    #     except (PropertyNotFoundException, UnauthorizedException, RepositoryException):
-    #         raise
-    #     except Exception as e:
-    #         logger.error(f"[PropertyService] Error deleting property: {str(e)}")
-    #         raise ServiceException(str(e))
-
-    # async def get_all_amenities(self):
-    #     logger.info("[PropertyService] Getting all amenities")
-    #     try:
-    #         amenities = await self.property_repository.get_all_amenities()
-    #         return [
-    #             DefaultAmenityResponse.model_validate(amenity).model_dump(mode="json")
-    #             for amenity in amenities
-    #         ]
-    #     except RepositoryException:
-    #         raise
-    #     except Exception as e:
-    #         logger.error(f"[PropertyService] Error getting all amenities: {str(e)}")
-    #         raise ServiceException(str(e))
-
-    # async def search_properties(
-    #     self, params: PropertySearchQueryParams
-    # ) -> list[PropertySearchResponse]:
-    #     logger.info(
-    #         "[PropertyService] Getting all properties for given search parameters"
-    #     )
-    #     if params.check_out <= params.check_in:
-    #         logger.error(
-    #             f"[PropertyService] Check_out date {params.check_out} is before the check_in date {params.check_out}"
-    #         )
-    #         raise InvalidDateException(
-    #             user_message="Check-out date must be after check-in date.",
-    #         )
-
-    #     try:
-    #         db_results = await self.property_repository.get_available_properties(
-    #             destination=params.destination,
-    #             check_in=params.check_in,
-    #             check_out=params.check_out,
-    #             adults=params.adults,
-    #             children=params.children,
-    #             room_count=params.room_count,
-    #         )
-
-    #         logger.info(
-    #             f"[PropertyService] Found {len(db_results)} properties for the given search parameters"
-    #         )
-
-    #         return [
-    #             PropertySearchResponse(
-    #                 property_id=row["property_id"],
-    #                 property_name=row["property_name"],
-    #                 price=row["price"],
-    #                 address=row["address"],
-    #                 city=row["city"],
-    #                 state=row["state"],
-    #                 country=row["country"],
-    #                 photo_url=row.get("photo_url") if row.get("photo_url") else "",
-    #             )
-    #             for row in db_results
-    #         ]
-
-    #     except (
-    #         InvalidDateException,
-    #         PropertyNotFoundException,
-    #         ImageStorageException,
-    #         RepositoryException,
-    #     ):
-    #         raise
-
-    #     except Exception as e:
-    #         logger.error(f"[PropertyService] Error searching properties: {str(e)}")
-    #         raise ServiceException(
-    #             "Failed to get the properties for given search parameters",
-    #             f"Failed to get the search properties{str(e)}",
-    #         )
+        # Utilizing Pydantic v2's model_validate to handle SQLAlchemy structures natively
+        return TenantPropertiesListResponse(
+            tenant_id=tenant_id,
+            total_count=total_count,
+            properties=[PropertyResponse.model_validate(p) for p in properties]
+        )

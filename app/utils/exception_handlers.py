@@ -73,12 +73,14 @@ async def handle_request_validation_error(
         )
     elif error_type == "missing":
         message = f"{field_name} is required"
+    elif error_type == "value_error":
+        message = first_error["msg"].replace("Value error, ", "")
     else:
         # Fallback for other standard errors
         raw_msg = first_error["msg"].replace("Value error, ", "")
         # Remove default generic prefix if it's there
         if raw_msg.startswith("Input should be "):
-            message = f"{field_name} {raw_msg.replace('Input should be ', '')}"
+            message = f"{field_name} must be {raw_msg.replace('Input should be ', '')}"
         else:
             message = f"{field_name}: {raw_msg}"
 

@@ -19,6 +19,8 @@ class TenantService:
     async def create_tenant(self, tenant: dict, owner_id: uuid.UUID) -> Tenant:
         logger.info(f"[TenantService] Creating tenant: {tenant}")
         tenant_data = tenant
+        if "name" in tenant_data and tenant_data["name"]:
+            tenant_data["slug"] = tenant_data["name"].lower().replace(" ", "-")
         tenant_data["owner_id"] = owner_id
 
         try:
@@ -102,6 +104,9 @@ class TenantService:
             tenant = await self.tenant_repo.get_tenant_by_id(tenant_id)
             if not tenant or tenant.owner_id != owner_id:
                 raise TenantNotFoundException(f"Tenant {tenant_id} not found")
+
+            if "name" in data and data["name"]:
+                data["slug"] = data["name"].lower().replace(" ", "-")
 
             updated = await self.tenant_repo.update_tenant(tenant_id, data)
             return updated

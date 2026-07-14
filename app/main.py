@@ -16,9 +16,9 @@ from app.modules.pms.models import *
 from app.modules.pms.routers.properties_routers import router as property_router
 from app.modules.pms.routers.room_routers import router as room_router
 from app.modules.pms.routers.tenants_routers import router as tenant_router
-from app.modules.pms.routers.offers_routers import router as offer_router
-from app.modules.pms.routers.image_routers import router as image_router
-from app.modules.pms.routers.discount_code_router import router as discount_code_router
+# from app.modules.pms.routers.offers_routers import router as offer_router
+# from app.modules.pms.routers.image_routers import router as image_router
+# from app.modules.pms.routers.discount_code_router import router as discount_code_router
 
 from app.modules.booking.models import *
 from app.utils.exception_handlers import register_exception_handlers
@@ -35,9 +35,7 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-# ── CORS must be registered first so it wraps exception handlers too ──
-# In Starlette 1.x, exception handler responses bypass middleware unless
-# middleware is added before any exception handlers or routers.
+
 DEFAULT_ORIGINS = [
     "http://localhost:8000",
     "http://localhost:5173",
@@ -70,9 +68,9 @@ app.include_router(user_router)
 app.include_router(tenant_router)
 app.include_router(property_router)
 app.include_router(room_router)
-app.include_router(offer_router)
-app.include_router(image_router)
-app.include_router(discount_code_router)
+# app.include_router(offer_router)
+# app.include_router(image_router)
+# app.include_router(discount_code_router)
 
 
 @app.get("/")

@@ -1,5 +1,6 @@
 from decimal import Decimal
 import uuid
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID,JSONB, ARRAY
 from sqlalchemy import (
@@ -15,7 +16,7 @@ from sqlalchemy import (
     text,
 )
 from app.config.database_config import Base
-from typing import Optional, List
+from typing import Optional, List,Dict,Any
 from enum import StrEnum
 
 from app.utils.timestamp import TimestampMixin
@@ -47,11 +48,12 @@ class Rooms(Base, TimestampMixin):
         CheckConstraint(
             "max_children >= 0 AND max_children <= 15", name="chk_max_children_range"
         ),
-        CheckConstraint("base_rate >= 0", name="chk_base_rate_positive"),
+        CheckConstraint("base_rate > 0", name="chk_base_rate_positive"),
         CheckConstraint("floor_number >= 0", name="chk_floor_number_non_negative"),
         UniqueConstraint(
             "property_id", "room_name", name="uq_rooms_property_id_room_name"
         ),
+        Index("ix_rooms_status", "status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -65,13 +67,13 @@ class Rooms(Base, TimestampMixin):
     )
     room_type_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("room_types.id", ondelete="CASCADE"),
+        ForeignKey("room_types.id", ondelete="RESTRICT"),
         index=True,
         nullable=False,
     )
     bed_type_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("bed_types.id", ondelete="CASCADE"),
+        ForeignKey("bed_types.id", ondelete="RESTRICT"),
         index=True,
         nullable=False,
     )
@@ -79,7 +81,7 @@ class Rooms(Base, TimestampMixin):
     room_name: Mapped[str] = mapped_column(String(100), nullable=False)
     max_adults: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
     max_children: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    base_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
+    base_rate: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     status: Mapped[RoomStatus] = mapped_column(
         SqlEnum(RoomStatus, native_enum=False, length=50),
         default=RoomStatus.AVAILABLE,
@@ -93,7 +95,7 @@ class Rooms(Base, TimestampMixin):
         nullable=False,
         default=CancellationPolicy.FLEXIBLE,
     )
-    # 2. Text Snapshot: The literal Title shown to guests (Resolves Default or Custom)
+    # 2. Text Snapshot: The literal Title shown to guests 
     cancellation_title: Mapped[str] = mapped_column(
         String(255), 
         nullable=False, 
@@ -106,24 +108,22 @@ class Rooms(Base, TimestampMixin):
         default="Full refund if cancelled up to 24 hours before check-in."
     )
     
-    # ─── OPTIMIZED PHOTOS (Embedded JSONB) ───────────────────────────
     # Handles 1 cover photo easily. Format: {"cover": "url", "gallery": ["url1"]}
     photos: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, 
+        MutableDict.as_mutable(JSONB), 
         server_default='{"cover": null, "gallery": []}', 
         nullable=False
     )   
 
-    # ─── OPTIMIZED AMENITIES (No Junction Tables) ────────────────────
     # References row UUIDs from the global master 'amenities' table
     system_amenity_ids: Mapped[List[uuid.UUID]] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), 
+        MutableList.as_mutable(ARRAY(UUID(as_uuid=True))), 
         server_default="{}", 
         nullable=False
     )
     # Inline custom amenities unique to this exact room tier
     custom_amenities: Mapped[List[Dict[str, Any]]] = mapped_column(
-        JSONB, 
+        MutableList.as_mutable(JSONB), 
         server_default="[]", 
         nullable=False
     )
@@ -146,6 +146,11 @@ class RoomType(Base, TimestampMixin):
             "room_type_name",
             unique=True,
             postgresql_where=text("is_default = true"),
+        ),
+        CheckConstraint(
+            "(is_default AND property_id IS NULL) OR "
+            "(NOT is_default AND property_id IS NOT NULL)",
+            name="chk_room_types_default_property_consistency",
         ),
     )
 
@@ -177,6 +182,11 @@ class BedType(Base, TimestampMixin):
             "bed_name",
             unique=True,
             postgresql_where=text("is_default = true"),
+        ),
+        CheckConstraint(
+            "(is_default AND property_id IS NULL) OR "
+            "(NOT is_default AND property_id IS NOT NULL)",
+            name="chk_bed_types_default_property_consistency",
         ),
     )
 

@@ -34,6 +34,8 @@ class GuestBase(BaseModel):
     @field_validator("full_name", mode="before")
     @classmethod
     def validate_name(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
         value = value.strip()
         if not re.match(r"^[a-zA-Z\s]+$", value):
             raise ValueError("Name must contain only alphabetic characters and spaces")

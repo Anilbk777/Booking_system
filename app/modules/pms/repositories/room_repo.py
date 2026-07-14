@@ -1,7 +1,7 @@
 from app.modules.pms.services.image_services import ImageService
 import uuid
 
-from sqlalchemy import delete, func, select, and_
+from sqlalchemy import delete, func, select, and_, or_
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,8 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.pms.models.properties_model import Amenity
 from app.modules.pms.models.rooms_model import (
     BedType,
-    RoomAmenity,
-    RoomPhoto,
+
     Rooms,
     RoomType,
 )
@@ -23,6 +22,7 @@ from app.utils.exceptions import (
     InvalidImageException
 )
 from app.utils.logging import LoggerFactory
+import psycopg.errors
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -33,157 +33,80 @@ class RoomRepository:
         self.image_service = image_service
 
     async def create_rooms(
-        self, room_data: list[dict], hotel_id: uuid.UUID
+        self, property_id :uuid.UUID, rooms_data: list[dict]
     ) -> list[dict]:
         logger.info(
-            f"[RoomRepository] Initiating bulk transaction for {len(room_data)} rooms"
+            f"[RoomRepository] Initiating bulk transaction for {len(rooms_data)} rooms"
         )
-
-        # Store all created rooms data to avoid overwriting references
-        saved_batch_results = []
-
         try:
-            for room_in in room_data:
-                room_type_data = room_in.pop("room_type")
-                bed_type_data = room_in.pop("bed_type")
-                photos_data = room_in.pop("photos")
-                amenities_data = room_in.pop("amenities")
-                rooms_data = room_in
-
-                # --- RESOLVE ROOM TYPE ---
-                rt_name = room_type_data["room_type_name"].strip()
-                is_rt_default = room_type_data.get("is_default", False)
-
-                # Check if this room type was already loaded or saved during this batch session
-                rt_stmt = select(RoomType).where(
-                    and_(
-                        func.lower(RoomType.room_type_name) == rt_name.lower(),
-                        RoomType.hotel_detail_id == hotel_id,
-                    )
-                )
-                rt_result = await self.db.execute(rt_stmt)
-                room_type_record = rt_result.scalar_one_or_none()
-
-                # If it doesn't exist, create it once
-                if not room_type_record:
-                    room_type_record = RoomType(
-                        hotel_detail_id=hotel_id,
-                        room_type_name=rt_name,
-                        is_default=is_rt_default,
-                    )
-                    self.db.add(room_type_record)
-                    await self.db.flush()  # Generate room_type_record.id
-
-                # --- RESOLVE BED TYPE ---
-                bt_name = bed_type_data["bed_name"].strip()
-                is_bt_default = bed_type_data.get("is_default", False)
-
-                bt_stmt = select(BedType).where(
-                    and_(
-                        func.lower(BedType.bed_name) == bt_name.lower(),
-                        BedType.hotel_detail_id == hotel_id,
-                    )
-                )
-                bt_result = await self.db.execute(bt_stmt)
-                bed_type_record = bt_result.scalar_one_or_none()
-
-                if not bed_type_record:
-                    bed_type_record = BedType(
-                        hotel_detail_id=hotel_id,
-                        bed_name=bt_name,
-                        is_default=is_bt_default,
-                    )
-                    self.db.add(bed_type_record)
-                    await self.db.flush()  # Generate bed_type_record.id
-
-                # --- CREATE THE ROOM ---
-                new_room = Rooms(
-                    hotel_detail_id=hotel_id,
-                    room_type_id=room_type_record.id,
-                    bed_type_id=bed_type_record.id,
-                    **rooms_data,
-                )
-                self.db.add(new_room)
-                await self.db.flush()  # Generate new_room.id
-
-                final_photo_urls: list[str] = []
-                if photos_data:
-                    real_room_id = str(new_room.id)
-                    public_ids = [
-                        self.image_service.extract_public_id_from_url(url)
-                        for url in photos_data
-                    ]
-                    fake_room_id = self.image_service.extract_fake_id_from_public_id(
-                        public_ids[0], "rooms"
-                    )
-
-                    for old_public_id in public_ids:
-                        new_public_id = old_public_id.replace(fake_room_id, real_room_id)
-                        final_public_id = new_public_id.replace("temp/", "")
-                        try:
-                            renamed = await self.image_service.provider.rename_image(
-                                old_public_id, final_public_id
-                            )
-                            final_photo_urls.append(renamed["url"])
-                        except Exception as e:
-                            logger.error(
-                                f"[RoomRepository] Failed to rename image {old_public_id}: {str(e)}"
-                            )
-                            raise ImageStorageException(
-                                "Failed to finalize room images", str(e)
-                            )
-                # --- PROCESS PHOTOS ---
-                photos_list = []
-                for photo in final_photo_urls:
-                    if photo.strip():
-                        new_photo = RoomPhoto(
-                            room_id=new_room.id, photo_url=photo.strip()
-                        )
-                        self.db.add(new_photo)
-                        photos_list.append(new_photo)
-
-                # --- PROCESS AMENITIES ---
-                amenities_list = []
-                for amenity_id in amenities_data:
-                    new_room_amenity = RoomAmenity(
-                        room_id=new_room.id, amenity_id=amenity_id
-                    )
-                    self.db.add(new_room_amenity)
-                    amenities_list.append(new_room_amenity)
-
-                # Append the structured record dictionary to the batch tracking collection
-                saved_batch_results.append(
-                    {
-                        "room": new_room,
-                        "room_type": room_type_record,
-                        "bed_type": bed_type_record,
-                        "room_photos": photos_list,
-                        "room_amenities": amenities_list,
-                    }
+            rooms = [
+                Rooms(
+                    property_id=property_id,
+                    room_type_id=room["room_type_id"],
+                    bed_type_id=room["bed_type_id"],
+                    floor_number=room["floor_number"],
+                    room_name=room["room_name"],
+                    max_adults=room["max_adults"],
+                    max_children=room["max_children"],
+                    base_rate=room["base_rate"],
+                    status=room["status"],
+                    cancellation_policy=room["cancellation_policy"],
+                    cancellation_title=room["cancellation_title"],
+                    cancellation_description=room["cancellation_description"],
+                    photos=room["photos"],
+                    system_amenity_ids=room["system_amenity_ids"],
+                    custom_amenities=room["custom_amenities"],
                 )
 
-            # Commit everything as a single atomic unit
-            await self.db.commit()
-            return saved_batch_results
+                for room in rooms_data
+            ]
+            self.db.add_all(rooms)
+            await self.db.flush()
 
-        except (ImageStorageException,InvalidImageException):
-            await self.db.rollback()
-            raise
+            for room in rooms:
+                await self.db.refresh(room)
 
-
+            return rooms
+     
         except IntegrityError as e:
             await self.db.rollback()
-            error_msg = str(e.orig) if hasattr(e, "orig") else str(e)
-            logger.error(
-                f"[RoomRepository] Bulk integrity violation crash: {error_msg}"
-            )
-            if "uq_rooms_hotel_detail_room_name" in error_msg:
-                raise RoomNameAlreadyExistsException(
-                    "A room with this room name/number already exists in this hotel."
-                )
-            raise RepositoryException(
-                f"Database consistency error during batch: {error_msg}"
-            )
+            
+            # Extract the underlying driver error (asyncpg)
+            orig_err = getattr(e, "orig", None)
+            
+            if orig_err and hasattr(orig_err, "__cause__"):
+                pg_exc = orig_err.__cause__
+                
+                if isinstance(pg_exc, psycopg.errors.UniqueViolation):
+                    # Target unique index/constraints (e.g., uq_room_types_property_id_room_type_name or your rooms unique name index)
+                    constraint_name = pg_exc.constraint_name or pg_exc.index_name
+                    logger.warning(f"[RoomRepository] Unique key or index conflict hit: {constraint_name}")
+                    raise RepositoryException(
+                        internal_detail=f"A room configuration or name collision occurred (Violated: {constraint_name}).",
+                        status_code = 400
+                    )
+                    
+                elif isinstance(pg_exc, psycopg.errors.CheckViolation):
+                    # Target check constraints (e.g., chk_room_types_default_property_consistency)
+                    constraint_name = pg_exc.constraint_name
+                    logger.warning(f"[RoomRepository] Check constraint broken: {constraint_name}")
+                    raise RepositoryException(
+                        internal_detail= f"Data failed business logic checks. Ensure standard/default flags are valid (Violated: {constraint_name}).",
+                        status_code = 400
+                    )
+                    
+                elif isinstance(pg_exc, psycopg.errors.ForeignKeyViolation):
+                    logger.warning(f"[RoomRepository] Foreign key link missing: {pg_exc.detail}")
+                    raise RepositoryException(
+                        internal_detail= f"The specified room type, bed type, or property ID does not exist.",
+                    
+                        status_code = 400
+                    )
+
+            # Fallback for generic integrity issues (e.g. non-nullable failures)
+            logger.error(f"[RoomRepository] Database consistency violation: {str(e)}")
+            raise RepositoryException(f"Database consistency error during batch processing: {str(e)}")
+
 
         except Exception as e:
             await self.db.rollback()
@@ -192,287 +115,90 @@ class RoomRepository:
             )
             raise RepositoryException(f"Failed to batch create rooms: {str(e)}")
 
-    async def get_all_rooms(self, hotel_id: uuid.UUID) -> list[Rooms]:
-        logger.info(f"[RoomRepository] Fetching all rooms for hotel {hotel_id}")
-        try:
-            stmt = (
-                select(Rooms)
-                .where(Rooms.hotel_detail_id == hotel_id)
-                .options(
-                    # Use joinedload for many-to-one objects (1-to-1 relations)
-                    joinedload(Rooms.bed_type),
-                    joinedload(Rooms.room_type),
-                    # Use selectinload for collection lists (1-to-many relations)
-                    selectinload(Rooms.room_photos),
-                    selectinload(Rooms.room_amenities).selectinload(
-                        RoomAmenity.amenity
-                    ),
-                )
-            )
-            result = await self.db.execute(stmt)
-            return list(result.scalars().all())
-        except Exception as e:
-            logger.error(f"[RoomRepository] Unexpected fetch collapse: {str(e)}")
-            raise RepositoryException(
-                internal_detail=f"Failed to fetch rooms: {str(e)}"
-            )
 
-    async def get_room_by_name(self, room_name: str, hotel_id: uuid.UUID):
-        try:
-            clean_name = room_name.strip()
-            stmt = select(Rooms).where(
-                and_(
-                    func.lower(Rooms.room_name) == clean_name.lower(),
-                    Rooms.hotel_detail_id == hotel_id,
-                )
-            )
-            result = await self.db.execute(stmt)
-            return result.scalar_one_or_none()
-        except Exception as e:
-            logger.error(f"[RoomRepository] Unexpected fetch collapse: {str(e)}")
-            raise RepositoryException(
-                internal_detail=f"Failed to fetch rooms: {str(e)}"
-            )
 
-    async def get_room_by_id(self, room_id: uuid.UUID, hotel_id: uuid.UUID):
-        try:
-            stmt = select(Rooms).where(
-                and_(Rooms.id == room_id, Rooms.hotel_detail_id == hotel_id)
-            )
-            result = await self.db.execute(stmt)
-            return result.scalar_one_or_none()
-        except Exception as e:
-            logger.error(f"[RoomRepository] Unexpected fetch collapse: {str(e)}")
-            raise RepositoryException(
-                internal_detail=f"Failed to fetch rooms: {str(e)}"
-            )
-
-    async def update_room(
-        self,
-        room_id: uuid.UUID,
-        hotel_id: uuid.UUID,
-        room_dict: dict,
-        room_type_data: dict,
-        bed_type_data: dict,
-        photos_data: list[str],
-        amenities_data: list[uuid.UUID],
+    async def get_exisitng_room_type_name(
+        self, property_id:uuid.UUID, name:str
     ):
-        logger.info(
-            f"[RoomRepository] Initiating atomic graph update for room: {room_id}"
-        )
-
+        """check name collision"""
+        logger.info(f"[RoomRepository] Validating room type name collision")
         try:
-            # 1. Fetch the target room row ensuring hotel ownership boundary isolation
-            stmt = select(Rooms).where(
-                and_(Rooms.id == room_id, Rooms.hotel_detail_id == hotel_id)
+            stmt = select(RoomType).where(
+            # Match either this specific property OR a global default (property_id is NULL)
+            or_(
+                RoomType.property_id == property_id,
+                RoomType.property_id.is_(None)
+            ),
+            func.lower(RoomType.room_type_name) == func.lower(name)
             )
             result = await self.db.execute(stmt)
-            existing_room = result.scalar_one_or_none()
+            return result.scalar_one_or_none()
 
-            if not existing_room:
-                logger.error(
-                    f"[RoomRepository] Room {room_id} not found under hotel context {hotel_id}."
-                )
-                raise RoomNotFoundException(
-                    "Room record not found or access unauthorized.",
-                    f"Room {room_id} not found under hotel context {hotel_id}.",
-                )
-
-            # 2. --- RESOLVE ROOM TYPE ---
-            rt_name = room_type_data["room_type_name"].strip()
-            is_rt_default = room_type_data.get("is_default", False)
-
-            rt_stmt = select(RoomType).where(
-                and_(
-                    func.lower(RoomType.room_type_name) == rt_name.lower(),
-                    RoomType.hotel_detail_id == hotel_id,
-                )
-            )
-            rt_result = await self.db.execute(rt_stmt)
-            room_type_record = rt_result.scalar_one_or_none()
-
-            if not room_type_record:
-                room_type_record = RoomType(
-                    hotel_detail_id=hotel_id,
-                    room_type_name=rt_name,
-                    is_default=is_rt_default,
-                )
-                self.db.add(room_type_record)
-                await self.db.flush()  # Generates room_type_record.id immediately
-
-            # 3. --- RESOLVE BED TYPE ---
-            bt_name = bed_type_data["bed_name"].strip()
-            is_bt_default = bed_type_data.get("is_default", False)
-
-            bt_stmt = select(BedType).where(
-                and_(
-                    func.lower(BedType.bed_name) == bt_name.lower(),
-                    BedType.hotel_detail_id == hotel_id,
-                )
-            )
-            bt_result = await self.db.execute(bt_stmt)
-            bed_type_record = bt_result.scalar_one_or_none()
-
-            if not bed_type_record:
-                bed_type_record = BedType(
-                    hotel_detail_id=hotel_id,
-                    bed_name=bt_name,
-                    is_default=is_bt_default,
-                )
-                self.db.add(bed_type_record)
-                await self.db.flush()  # Generates bed_type_record.id immediately
-
-            # 4. --- OVERWRITE CORE ROOM FIELDS ---
-            existing_room.room_type_id = room_type_record.id
-            existing_room.bed_type_id = bed_type_record.id
-
-            for key, val in room_dict.items():
-                setattr(existing_room, key, val)
-
-            # 5. --- SYNC ROOM PHOTOS ---
-            await self.db.execute(delete(RoomPhoto).where(RoomPhoto.room_id == room_id))
-            photos_list = []
-            real_room_id = str(room_id)
-            final_photo_urls: list[str] = []
-            if photos_data:
-                for url in photos_data: 
-                    old_public_id = self.image_service.extract_public_id_from_url(url)
-                    current_folder_id = self.image_service.extract_fake_id_from_public_id(
-                        old_public_id, "rooms"
-                    )
-
-                    if current_folder_id == real_room_id:
-                        # Already lives in the correct permanent folder — nothing to rename
-                        final_photo_urls.append(url)
-                        continue
-
-                    # Still under a fake id (uploaded fresh this edit session) — rename it
-                    new_public_id = old_public_id.replace(current_folder_id, real_room_id)
-                    final_public_id = new_public_id.replace("temp/", "")
-
-                    try:
-                        renamed = await self.image_service.provider.rename_image(
-                            old_public_id, final_public_id
-                        )
-                        final_photo_urls.append(renamed["url"])
-                    except Exception as e:
-                        logger.error(
-                            f"[PropertyRepository] Failed to rename image {old_public_id}: {str(e)}"
-                        )
-                        raise ImageStorageException(
-                            "Failed to finalize property images",
-                            f"Failed to finalize property images: {str(e)}",
-                        )
-                for photo in final_photo_urls:
-                    if photo and photo.strip():
-                        new_photo = RoomPhoto(room_id=room_id, photo_url=photo.strip())
-                        self.db.add(new_photo)
-                        photos_list.append(new_photo)
-
-            # 6. --- SYNC ROOM AMENITIES ---
-            await self.db.execute(
-                delete(RoomAmenity).where(RoomAmenity.room_id == room_id)
-            )
-            amenities_list = []
-            fetched_amenities = []
-            if amenities_data:
-                # Look up all complete Amenity model objects in a single, fast batch query
-                am_stmt = select(Amenity).where(Amenity.id.in_(amenities_data))
-                am_result = await self.db.execute(am_stmt)
-                fetched_amenities = am_result.scalars().all()
-
-            for amenity_record in fetched_amenities:
-                # Assign the full relationship reference directly during creation
-                new_room_amenity = RoomAmenity(
-                    room_id=room_id,
-                    amenity_id=amenity_record.id,
-                    amenity=amenity_record,  # This eagerly locks the object into memory!
-                )
-                self.db.add(new_room_amenity)
-                amenities_list.append(new_room_amenity)
-
-            # 7. Flush state variables to trigger DB constraint logic checks (like uq_rooms_hotel_detail_room_name)
-            await self.db.flush()
-
-            # 8. Finalize database transaction safely
-            await self.db.commit()
-            logger.info(
-                f"[RoomRepository] Room graph updated and committed successfully for ID: {room_id}"
-            )
-
-            return {
-                "room": existing_room,
-                "room_type": room_type_record,
-                "bed_type": bed_type_record,
-                "room_photos": photos_list,
-                "room_amenities": amenities_list,
-            }
-
-        except (RoomNotFoundException, RoomNameAlreadyExistsException, ImageStorageException, InvalidImageException):
-            await self.db.rollback()
-            raise
-
-        except IntegrityError as e:
-            await self.db.rollback()
-            error_msg = str(e.orig) if hasattr(e, "orig") else str(e)
+        except Exception as e:
             logger.error(
-                f"[RoomRepository] Integrity violation during room update: {error_msg}"
+                f"[RoomRepository] Unexpected error checking room type name collision: {str(e)}"
             )
+            raise RepositoryException(f"Failed to check room type name collision: {str(e)}")
+            
 
-            # Explicit duplicate check handling matching your create routine
-            if "uq_rooms_hotel_detail_room_name" in error_msg:
-                raise RoomNameAlreadyExistsException(
-                    "A room with this room name/number already exists in this hotel."
-                )
-            if "room_amenities_amenity_id_fkey" in error_msg:
-                raise AmenityNotFoundException(
-                    "One or more amenities provided do not exist."
-                )
-            raise RepositoryException(
-                "Failed to update room",
-                f"Database consistency error during update: {error_msg}",
+    async def get_exisiting_bed_type_name(
+        self, property_id:uuid.UUID, name:str
+    ):
+        logger.info(f"[RoomRepository] validating bed type name collision")
+        try:
+            stmt = select(BedType).where(
+            # Match either this specific property OR a global default (property_id is NULL)
+            or_(
+                BedType.property_id == property_id,
+                BedType.property_id.is_(None)
+            ),
+            func.lower(BedType.bed_name) == func.lower(name)
             )
+            result = await self.db.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"[RoomRepository] Unexpected error checking bed type name collision: {str(e)}"
+            )
+            raise RepositoryException(f"Failed to check bed type name collision: {str(e)}")
 
+
+    async def create_room_type(
+        self, property_id:uuid.UUID, room_type_data:dict
+    ):
+        try:
+            room_type = RoomType(
+                property_id=property_id,
+                room_type_name=room_type_data["room_type_name"],
+                is_default=False,
+            )
+            self.db.add(room_type)
+            await self.db.commit()
+            await self.db.refresh(room_type)
+            return room_type
         except Exception as e:
             await self.db.rollback()
             logger.error(
-                f"[RoomRepository] Unexpected update transaction collapse: {str(e)}"
+                f"[RoomRepository] Unexpected error creating room type: {str(e)}"
             )
-            raise RepositoryException(
-                "Unable to update room.Please try again later.", f"Failed to update room: {str(e)} "
-            )
+            raise RepositoryException(f"Failed to create room type: {str(e)}")
 
-        
-    async def delete_room(self, room_id: uuid.UUID, hotel_id: uuid.UUID) -> Rooms:
-        logger.info(f"[RoomRepository] Initiating atomic removal sequence for room ID: {room_id}")
+    async def create_bed_type(
+        self, property_id:uuid.UUID, bed_type_data:dict
+    ):
         try:
-            stmt = select(Rooms).where(
-                and_(Rooms.id == room_id, Rooms.hotel_detail_id == hotel_id)
+            bed_type = BedType(
+                property_id=property_id,
+                bed_name=bed_type_data["bed_name"],
+                is_default=False,
             )
-            result = await self.db.execute(stmt)
-            existing_room = result.scalar_one_or_none()
-            
-            if not existing_room:
-                logger.error(f"[RoomRepository] Room {room_id} not found under hotel context {hotel_id}.")
-                raise RoomNotFoundException(
-                    "Room record not found or access unauthorized.",
-                    f"Room {room_id} not found under hotel context {hotel_id}.",
-                )
-
-            delete_stmt = delete(Rooms).where(Rooms.id == room_id)
-            await self.db.execute(delete_stmt)
-            
+            self.db.add(bed_type)
             await self.db.commit()
-            logger.info(f"[RoomRepository] Room graph purged successfully for ID: {room_id}")
-            
-            return existing_room
-
-        except RoomNotFoundException:
-            await self.db.rollback()
-            raise
+            await self.db.refresh(bed_type)
+            return bed_type
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"[RoomRepository] Unexpected delete transaction collapse: {str(e)}")
-            raise RepositoryException(
-                "Failed to delete room", f"Failed to delete room: {str(e)}"
+            logger.error(
+                f"[RoomRepository] Unexpected error creating bed type: {str(e)}"
             )
+            raise RepositoryException(f"Failed to create bed type: {str(e)}")
