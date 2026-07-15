@@ -21,6 +21,7 @@ from app.modules.pms.models.properties_model import PropertyType
 
 MAX_IMAGES_PER_PROPERTY = 20
 
+
 class TimestampSchema(BaseModel):
     created_at: datetime
     updated_at: datetime
@@ -36,9 +37,9 @@ class GeneralPropertyInfo(BaseModel):
         description="Name of the property",
     )
     type: PropertyType = Field(
-        title= "property type",
+        title="property type",
         default=PropertyType.HOTEL,
-        description="Type of the property"
+        description="Type of the property",
     )
     description: Optional[str] = Field(
         None,
@@ -51,7 +52,7 @@ class GeneralPropertyInfo(BaseModel):
         ge=1,
         le=10000,
         title="Total Rooms",
-        description="Total number of rooms"
+        description="Total number of rooms",
     )
     year_built: Optional[int] = Field(
         None,
@@ -68,14 +69,14 @@ class GeneralPropertyInfo(BaseModel):
         description="Number of floors in the property",
     )
 
-    phone_number:str = Field(
+    phone_number: str = Field(
         ...,
         min_length=10,
         max_length=10,
         title="Phone Number",
         description="Phone number of the property owner for the property",
     )
-    email:EmailStr = Field(
+    email: EmailStr = Field(
         ...,
         title="Email",
         description="Email of the property owner for the property",
@@ -83,7 +84,7 @@ class GeneralPropertyInfo(BaseModel):
 
     @field_validator("phone_number")
     @classmethod
-    def verify_phone_number(cls, value:str) -> str:
+    def verify_phone_number(cls, value: str) -> str:
         value = value.strip()
         if " " in value:
             raise ValueError("Phone number must not contain spaces.")
@@ -95,7 +96,7 @@ class GeneralPropertyInfo(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def clean_and_verify_name(cls, value:str) -> str:
+    def clean_and_verify_name(cls, value: str) -> str:
         value = value.strip()
         return value
 
@@ -104,11 +105,12 @@ class GeneralPropertyInfo(BaseModel):
     def pre_strip_email(cls, value: str) -> str:
         if isinstance(value, str):
             return value.strip()
-        return value    
+        return value
 
 
-class GeneralPropertyInfoResponse(GeneralPropertyInfo,TimestampSchema):
+class GeneralPropertyInfoResponse(GeneralPropertyInfo, TimestampSchema):
     id: uuid.UUID
+
 
 class Location(BaseModel):
     country: str = Field(
@@ -168,35 +170,38 @@ class LocationResponse(Location):
 
 
 class CustomAmenityItem(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100, description="Name of the custom amenity")
-    icon: Optional[str] = Field(None, max_length=50, description="Icon code (e.g. 'fa-wifi')")
+    name: str = Field(
+        ..., min_length=2, max_length=100, description="Name of the custom amenity"
+    )
+    icon: Optional[str] = Field(
+        None, max_length=50, description="Icon code (e.g. 'fa-wifi')"
+    )
+
 
 class PhotoCollection(BaseModel):
     cover: Optional[str] = Field(
-        None, 
-        description="The primary cover image URL. If None, no cover is set."
+        None, description="The primary cover image URL. If None, no cover is set."
     )
     gallery: List[str] = Field(
-        default_factory=list, 
-        description="List of secondary image URLs."
+        default_factory=list, description="List of secondary image URLs."
     )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_gallery_limit(self):
         # Optional: Prevent users from uploading 500 images and crashing your UI
         if len(self.gallery) > 20:
             raise ValueError("Gallery cannot contain more than 20 images.")
         return self
 
+
 class PropertyAmenity(BaseModel):
     system_amenity_ids: List[uuid.UUID] = Field(
-        default_factory=list, 
-        description="List of system-provided amenity IDs"
+        default_factory=list, description="List of system-provided amenity IDs"
     )
     custom_amenities: List[CustomAmenityItem] = Field(
-        default_factory=list, 
-        description="List of user-defined custom amenities"
+        default_factory=list, description="List of user-defined custom amenities"
     )
+
 
 class PropertyPhotosAndAmenities(BaseModel):
     photos: PhotoCollection = Field(default_factory=PhotoCollection)
@@ -226,10 +231,8 @@ class PropertyPhotosAndAmenitiesResponse(BaseModel):
         return data
 
 
-
-
 class Propertylocalization(BaseModel):
-    currency:str =Field(
+    currency: str = Field(
         default="NPR",
         min_length=3,
         max_length=20,
@@ -244,7 +247,7 @@ class Propertylocalization(BaseModel):
         description="Timezone of the tenant",
     )
 
-    language:str =Field(
+    language: str = Field(
         default="English",
         min_length=2,
         max_length=50,
@@ -252,7 +255,7 @@ class Propertylocalization(BaseModel):
         description="Language of the property",
     )
 
-    check_in_time:Optional[str] =Field(
+    check_in_time: Optional[str] = Field(
         default=None,
         min_length=2,
         max_length=8,
@@ -260,14 +263,14 @@ class Propertylocalization(BaseModel):
         description="Check in time of the property",
     )
 
-    check_out_time:Optional[str] =Field(
+    check_out_time: Optional[str] = Field(
         default=None,
         min_length=2,
         max_length=8,
         title="Check Out Time",
         description="Check out time of the property",
     )
-    check_in_grace_period:int =Field(
+    check_in_grace_period: int = Field(
         default=0,
         le=60,
         ge=0,
@@ -275,19 +278,19 @@ class Propertylocalization(BaseModel):
         description="Check in grace period of the property",
     )
 
-    check_out_grace_period:int =Field(
+    check_out_grace_period: int = Field(
         default=0,
         le=60,
         ge=0,
         title="Check Out Grace Period",
         description="Check out grace period of the property",
     )
-    always_allow_check_in_out:bool = Field(
+    always_allow_check_in_out: bool = Field(
         default=False,
         title="Always Allow Check In and Check Out",
         description="Always allow check in and check out of the property",
     )
-    
+
     # @field_validator("timezone", mode="before")
     # @classmethod
     # def validate_timezone(cls, value: str) -> str:
@@ -307,27 +310,31 @@ class Propertylocalization(BaseModel):
 
         if always_allow:
             if has_check_in or has_check_out:
-                raise ValueError("Check in time and check out time must be None when always allow check in and check out is On")
+                raise ValueError(
+                    "Check in time and check out time must be None when always allow check in and check out is On"
+                )
         else:
             if not has_check_in or not has_check_out:
-                raise ValueError("Check in time and check out time are required when always allow check in and check out is Off")
-                
+                raise ValueError(
+                    "Check in time and check out time are required when always allow check in and check out is Off"
+                )
+
         return self
 
-    
 
 class PropertylocalizationResponse(Propertylocalization):
     id: uuid.UUID
-    model_config= ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
+
 
 class BrandVisual(BaseModel):
-    brand_logo_url:str = Field(
+    brand_logo_url: str = Field(
         None,
         max_length=2048,
         title="Brand Logo URL",
         description="URL of the brand logo",
     )
-    brand_color:str = Field(
+    brand_color: str = Field(
         None,
         min_length=3,
         max_length=7,
@@ -335,15 +342,26 @@ class BrandVisual(BaseModel):
         description="Color of the brand",
     )
 
+
 class BrandVisualResponse(BrandVisual):
     id: uuid.UUID
-    model_config=ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
 
+
+class SystemAmenityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str = Field(..., max_length=100, description="The master amenity name")
+    icon: Optional[str] = Field(
+        None, max_length=100, description="The UI icon slug string"
+    )
 
 
 class PropertyPhotos(BaseModel):
     cover: Optional[str] = None
     gallery: List[str] = Field(default_factory=list)
+
 
 # --- Base Property Schema for Data Output ---
 class PropertyResponse(BaseModel):
@@ -355,7 +373,7 @@ class PropertyResponse(BaseModel):
     name: str = Field(..., max_length=255)
     type: PropertyType
     description: Optional[str] = Field(None, max_length=2000)
-    
+
     # Geo-location
     country: Optional[str] = Field(None, max_length=255)
     state: Optional[str] = Field(None, max_length=255)
@@ -374,7 +392,7 @@ class PropertyResponse(BaseModel):
     number_of_floors: int = Field(default=1, ge=1)
     total_rooms: int = Field(default=1, ge=1)
     year_built: Optional[int] = Field(None, ge=1800, le=2100)
-    
+
     # Contact
     phone_number: Optional[str] = Field(None, max_length=15)
     email: Optional[EmailStr] = None  # Validates email format
@@ -385,29 +403,23 @@ class PropertyResponse(BaseModel):
     language: Optional[str] = Field(None, max_length=100)
     brand_logo_url: Optional[str] = Field(None, max_length=2048)
     brand_color: Optional[str] = Field(None, max_length=20)
-    
+
     is_active: bool
 
     # Amenities & Media
-    system_amenity_ids: List[uuid.UUID] = Field(default_factory=list)
+    system_amenities: List[SystemAmenityResponse] = Field(default_factory=list)
     custom_amenities: List[dict[str, Any]] = Field(default_factory=list)
     photos: PropertyPhotos
+
 
 # --- Bulk Retrieval Schema ---
 class TenantPropertiesListResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     tenant_id: uuid.UUID
     total_count: int
     properties: List[PropertyResponse]
 
-
-class SystemAmenityResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    
-    id: uuid.UUID
-    name: str = Field(..., max_length=100, description="The master amenity name")
-    icon: Optional[str] = Field(None, max_length=100, description="The UI icon slug string")
 
 class SystemAmenitiesListResponse(BaseModel):
     total_count: int

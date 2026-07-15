@@ -22,6 +22,7 @@ from typing import Optional, Sequence
 
 logger = LoggerFactory.get_logger(__name__)
 
+
 class PropertyRepository:
     def __init__(self, db: AsyncSession, image_service: ImageService):
         self.db = db
@@ -33,8 +34,7 @@ class PropertyRepository:
         logger.info(f"[PropertyRepository] Getting property by id: {property_id}")
         try:
             result = await self.db.execute(
-                select(Property)
-                .where(
+                select(Property).where(
                     Property.id == property_id,
                     Property.tenant_id == tenant_id,
                 )
@@ -64,19 +64,16 @@ class PropertyRepository:
             )
             raise RepositoryException(internal_detail=str(e))
 
-    
-
-    async def create_general_information(self, property_data: dict, tenant_id: uuid.UUID) -> dict:
+    async def create_general_information(
+        self, property_data: dict, tenant_id: uuid.UUID
+    ) -> dict:
         logger.info("[PropertyRepository] Creating general information")
         try:
-            new_property = Property(
-                tenant_id=tenant_id,
-                **property_data
-            )
+            new_property = Property(tenant_id=tenant_id, **property_data)
             self.db.add(new_property)
             await self.db.commit()
             await self.db.refresh(new_property)
-            
+
             return {
                 "id": new_property.id,
                 "name": new_property.name,
@@ -88,33 +85,42 @@ class PropertyRepository:
                 "phone_number": new_property.phone_number,
                 "email": new_property.email,
                 "created_at": new_property.created_at,
-                "updated_at": new_property.updated_at
+                "updated_at": new_property.updated_at,
             }
         except IntegrityError as e:
             await self.db.rollback()
-            logger.error(f"[PropertyRepository] Integrity Error creating general information: {str(e)}")
-            raise RepositoryException(internal_detail=f"Database consistency failure: {str(e)}")
+            logger.error(
+                f"[PropertyRepository] Integrity Error creating general information: {str(e)}"
+            )
+            raise RepositoryException(
+                internal_detail=f"Database consistency failure: {str(e)}"
+            )
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"[PropertyRepository] Error creating general information: {str(e)}")
+            logger.error(
+                f"[PropertyRepository] Error creating general information: {str(e)}"
+            )
             raise RepositoryException(internal_detail=str(e))
 
-    async def create_location(self, property_id: uuid.UUID, tenant_id: uuid.UUID, location_data: dict) -> Property:
-        logger.info(f"[PropertyRepository] Updating location for property: {property_id}")
+    async def create_location(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID, location_data: dict
+    ) -> Property:
+        logger.info(
+            f"[PropertyRepository] Updating location for property: {property_id}"
+        )
         try:
             result = await self.db.execute(
                 select(Property).where(
-                    Property.id == property_id,
-                    Property.tenant_id == tenant_id
+                    Property.id == property_id, Property.tenant_id == tenant_id
                 )
             )
             property_obj = result.scalar_one_or_none()
             if not property_obj:
                 raise PropertyNotFoundException("Property not found or access denied")
-                
+
             for key, value in location_data.items():
                 setattr(property_obj, key, value)
-                
+
             await self.db.commit()
             await self.db.refresh(property_obj)
             return property_obj
@@ -158,7 +164,7 @@ class PropertyRepository:
                 )
                 raise AmenityNotFoundException(
                     user_message="One or more provided default amenities are not found.",
-                    internal_detail=f"Invalid system amenity IDs: {missing_str}"
+                    internal_detail=f"Invalid system amenity IDs: {missing_str}",
                 )
 
             system_names = {row.name.lower() for row in rows}
@@ -170,29 +176,32 @@ class PropertyRepository:
             logger.error(f"[PropertyRepository] Error validating amenities: {str(e)}")
             raise RepositoryException(internal_detail=str(e))
 
-    async def create_photos_and_amenities(self, property_id: uuid.UUID, tenant_id: uuid.UUID, data: dict) -> Property:
-        logger.info(f"[PropertyRepository] creating photos and amenities for property: {property_id}")
+    async def create_photos_and_amenities(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID, data: dict
+    ) -> Property:
+        logger.info(
+            f"[PropertyRepository] creating photos and amenities for property: {property_id}"
+        )
         try:
             result = await self.db.execute(
                 select(Property).where(
-                    Property.id == property_id,
-                    Property.tenant_id == tenant_id
+                    Property.id == property_id, Property.tenant_id == tenant_id
                 )
             )
             property_obj = result.scalar_one_or_none()
             if not property_obj:
                 raise PropertyNotFoundException("Property not found or access denied")
-                
+
             if "photos" in data:
                 property_obj.photos = data["photos"]
-            
+
             if "amenities" in data:
                 amenities = data["amenities"]
                 if "system_amenity_ids" in amenities:
                     property_obj.system_amenity_ids = amenities["system_amenity_ids"]
                 if "custom_amenities" in amenities:
                     property_obj.custom_amenities = amenities["custom_amenities"]
-                    
+
             await self.db.commit()
             await self.db.refresh(property_obj)
             return property_obj
@@ -200,25 +209,30 @@ class PropertyRepository:
             raise
         except Exception as e:
             await self.db.rollback()
-            logger.error(f"[PropertyRepository] Error creating photos and amenities: {str(e)}")
+            logger.error(
+                f"[PropertyRepository] Error creating photos and amenities: {str(e)}"
+            )
             raise RepositoryException(internal_detail=str(e))
 
-    async def create_localization(self, property_id: uuid.UUID, tenant_id: uuid.UUID, localization_data: dict) -> Property:
-        logger.info(f"[PropertyRepository] Updating localization for property: {property_id}")
+    async def create_localization(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID, localization_data: dict
+    ) -> Property:
+        logger.info(
+            f"[PropertyRepository] Updating localization for property: {property_id}"
+        )
         try:
             result = await self.db.execute(
                 select(Property).where(
-                    Property.id == property_id,
-                    Property.tenant_id == tenant_id
+                    Property.id == property_id, Property.tenant_id == tenant_id
                 )
             )
             property_obj = result.scalar_one_or_none()
             if not property_obj:
                 raise PropertyNotFoundException("Property not found or access denied")
-                
+
             for key, value in localization_data.items():
                 setattr(property_obj, key, value)
-                
+
             await self.db.commit()
             await self.db.refresh(property_obj)
             return property_obj
@@ -229,22 +243,25 @@ class PropertyRepository:
             logger.error(f"[PropertyRepository] Error updating localization: {str(e)}")
             raise RepositoryException(internal_detail=str(e))
 
-    async def create_brand_visual(self, property_id: uuid.UUID, tenant_id: uuid.UUID, brand_data: dict) -> Property:
-        logger.info(f"[PropertyRepository] Updating brand visual for property: {property_id}")
+    async def create_brand_visual(
+        self, property_id: uuid.UUID, tenant_id: uuid.UUID, brand_data: dict
+    ) -> Property:
+        logger.info(
+            f"[PropertyRepository] Updating brand visual for property: {property_id}"
+        )
         try:
             result = await self.db.execute(
                 select(Property).where(
-                    Property.id == property_id,
-                    Property.tenant_id == tenant_id
+                    Property.id == property_id, Property.tenant_id == tenant_id
                 )
             )
             property_obj = result.scalar_one_or_none()
             if not property_obj:
                 raise PropertyNotFoundException("Property not found or access denied")
-                
+
             for key, value in brand_data.items():
                 setattr(property_obj, key, value)
-                
+
             await self.db.commit()
             await self.db.refresh(property_obj)
             return property_obj
@@ -254,7 +271,6 @@ class PropertyRepository:
             await self.db.rollback()
             logger.error(f"[PropertyRepository] Error updating brand visual: {str(e)}")
             raise RepositoryException(internal_detail=str(e))
-
 
     async def get_properties_by_tenant(
         self, tenant_id: uuid.UUID, skip: int = 0, limit: int = 10
@@ -281,7 +297,7 @@ class PropertyRepository:
         count_result = await self.db.execute(count_query)
         total_count = count_result.scalar_one()
 
-        return properties, total_count 
+        return properties, total_count
 
     async def get_all_system_amenities(self) -> Sequence[Amenity]:
         """
@@ -293,5 +309,29 @@ class PropertyRepository:
             result = await self.db.execute(stmt)
             return result.scalars().all()
         except Exception as e:
-            logger.error(f"[AmenityRepository] Failed to fetch system amenities: {str(e)}")
+            logger.error(
+                f"[AmenityRepository] Failed to fetch system amenities: {str(e)}"
+            )
+            raise RepositoryException(f"Failed to load system master options: {str(e)}")
+
+    async def resolve_amenities_for_property(
+        self, amenity_ids: list[uuid.UUID]
+    ) -> Sequence[Amenity]:
+        """
+        Fetches the full Amenity records belonging specifically to this property's array.
+        """
+        logger.info(
+            f"[AmenityRepository] Resolving amenities for property: {amenity_ids}"
+        )
+        try:
+            if not amenity_ids:
+                return []
+
+            stmt = select(Amenity).where(Amenity.id.in_(amenity_ids))
+            result = await self.db.execute(stmt)
+            return result.scalars().all()
+        except Exception as e:
+            logger.error(
+                f"[AmenityRepository] Failed to resolve amenities for property: {str(e)}"
+            )
             raise RepositoryException(f"Failed to load system master options: {str(e)}")

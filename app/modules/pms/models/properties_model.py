@@ -7,10 +7,12 @@ from sqlalchemy import (
     UniqueConstraint, Index, CheckConstraint, Enum as SqlEnum
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from enum import StrEnum
 from app.utils.timestamp import TimestampMixin
 from app.config.database_config import Base
+from app.modules.pms.models.nested_mutable import NestedMutable
 
 class PropertyType(StrEnum):
     HOTEL = "HOTEL"
@@ -102,18 +104,15 @@ class Property(Base, TimestampMixin):
     
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # ─── AMENITIES STRUCTURING ──────────────────────────────────────
     system_amenity_ids: Mapped[List[uuid.UUID]] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), server_default="{}", nullable=True
+        MutableList.as_mutable(ARRAY(UUID(as_uuid=True))), server_default="{}", nullable=True
     )
     custom_amenities: Mapped[List[Dict[str, Any]]] = mapped_column(
-        JSONB, server_default="[]", nullable=True
+        NestedMutable.as_mutable(JSONB), server_default="[]", nullable=True
     )
 
-    # ─── PHOTOS EMBEDDED JSONB ──────────────────────────────────────
-    # Structure: {"cover": "url_string", "gallery": ["url1", "url2"]}
     photos: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, 
+        NestedMutable.as_mutable(JSONB), 
         server_default='{"cover": null, "gallery": []}', 
         nullable=True
     )

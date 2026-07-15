@@ -20,7 +20,7 @@ from typing import Optional, List,Dict,Any
 from enum import StrEnum
 
 from app.utils.timestamp import TimestampMixin
-
+from app.modules.pms.models.nested_mutable import NestedMutable
 
 class RoomStatus(StrEnum):
     AVAILABLE = "AVAILABLE"
@@ -110,10 +110,10 @@ class Rooms(Base, TimestampMixin):
     
     # Handles 1 cover photo easily. Format: {"cover": "url", "gallery": ["url1"]}
     photos: Mapped[Dict[str, Any]] = mapped_column(
-        MutableDict.as_mutable(JSONB), 
+        NestedMutable.as_mutable(JSONB), 
         server_default='{"cover": null, "gallery": []}', 
         nullable=False
-    )   
+    )    
 
     # References row UUIDs from the global master 'amenities' table
     system_amenity_ids: Mapped[List[uuid.UUID]] = mapped_column(
@@ -123,7 +123,7 @@ class Rooms(Base, TimestampMixin):
     )
     # Inline custom amenities unique to this exact room tier
     custom_amenities: Mapped[List[Dict[str, Any]]] = mapped_column(
-        MutableList.as_mutable(JSONB), 
+        NestedMutable.as_mutable(JSONB), 
         server_default="[]", 
         nullable=False
     )
