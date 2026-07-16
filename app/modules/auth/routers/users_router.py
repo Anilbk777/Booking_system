@@ -5,6 +5,7 @@ from app.modules.auth.schemas.token_schema import (
     VerifyOTP,
     ResendOTP,
     RefreshTokenRequest,
+    AccessTokenResponse,
 )
 from app.modules.auth.services.users_services import UserService
 from app.modules.auth.dependencies import get_user_service
@@ -59,7 +60,7 @@ async def login_user(
     return await user_service.login_user(user_info)
 
 
-@router.post("/refresh", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/refresh", response_model=AccessTokenResponse, status_code=status.HTTP_200_OK)
 async def refresh_token(
     refresh_token: RefreshTokenRequest,
     user_service: UserService = Depends(get_user_service),

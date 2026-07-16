@@ -9,6 +9,7 @@ from app.modules.auth.schemas.token_schema import (
     VerifyOTP,
     ResendOTP,
     RefreshTokenRequest,
+    AccessTokenResponse,
 )
 from app.modules.auth.auth_middlewares import CurrentGuest
 
@@ -54,7 +55,7 @@ async def login_guest(
     return await guest_service.login_guest(guest_dict)
 
 
-@router.post("/refresh", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/refresh", response_model=AccessTokenResponse, status_code=status.HTTP_200_OK)
 async def refresh_token(
     refresh_token: RefreshTokenRequest,
     guest_service: Annotated[GuestService, Depends(get_guest_service)],

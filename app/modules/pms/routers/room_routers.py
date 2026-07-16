@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
 from app.modules.auth.auth_middlewares import CurrentUser
 from app.modules.pms.dependencies import get_room_service

@@ -203,7 +203,6 @@ class UserService:
             token_data = {"sub": str(payload["user_id"]), "role": payload["role"]}
             return {
                 "access_token": self.auth_service.create_access_token(token_data),
-                "refresh_token": self.auth_service.create_refresh_token(token_data),
                 "token_type": "bearer",
             }
         except InvalidRefreshTokenException:
