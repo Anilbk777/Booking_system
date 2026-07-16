@@ -5,22 +5,20 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.modules.auth.auth_middlewares import CurrentUser
 from app.modules.pms.dependencies import get_room_service
 from app.modules.pms.schemas.room_schemas import (
-
     RoomBulkCreateRequest,
     RoomBulkCreateResponse,
     RoomTypeCreate,
     BedTypeCreate,
     RoomTypeResponse,
     BedTypeResponse,
-    RoomResponse
-
+    RoomResponse,
 )
 
 from app.modules.pms.services.room_services import RoomService
 from app.utils.schemas import StandardResponse
 from app.utils.validation import verify_tenant
-router = APIRouter(prefix="/properties/{property_id}/rooms", tags=["Rooms"])
 
+router = APIRouter(prefix="/properties/{property_id}/rooms", tags=["Rooms"])
 
 
 @router.get(
@@ -39,11 +37,9 @@ async def get_rooms(
         property_id=property_id,
         tenant_id=user.tenant_id,
     )
-    return {
-        "success": True,
-        "data": response
-    }
-    
+    return {"success": True, "data": response}
+
+
 @router.post(
     "",
     response_model=StandardResponse[RoomBulkCreateResponse],
@@ -63,10 +59,7 @@ async def create_rooms(
         tenant_id=user.tenant_id,
         payload=payload,
     )
-    return {
-        "success": True,
-        "data": response
-    }
+    return {"success": True, "data": response}
 
 
 @router.post(
@@ -87,10 +80,8 @@ async def create_room_type(
         tenant_id=user.tenant_id,
         payload=payload,
     )
-    return {
-        "success": True,
-        "data": response
-    }
+    return {"success": True, "data": response}
+
 
 @router.post(
     "/bed-type",
@@ -110,10 +101,8 @@ async def create_bed_type(
         tenant_id=user.tenant_id,
         payload=payload,
     )
-    return {
-        "success": True,
-        "data": response
-    }
+    return {"success": True, "data": response}
+
 
 @router.get(
     "/room-types",
@@ -131,11 +120,15 @@ async def get_all_room_types(
         property_id=property_id,
         tenant_id=user.tenant_id,
     )
-    return {
-        "success": True,
-        "data": response
-    }
+    return {"success": True, "data": response}
 
+
+@router.get(
+    "/bed-types",
+    response_model=StandardResponse[list[BedTypeResponse]],
+    status_code=status.HTTP_200_OK,
+    summary="Get all bed types",
+)
 async def get_all_bed_types(
     property_id: uuid.UUID,
     user: CurrentUser,
@@ -146,7 +139,4 @@ async def get_all_bed_types(
         property_id=property_id,
         tenant_id=user.tenant_id,
     )
-    return {
-        "success": True,
-        "data": response
-    }
+    return {"success": True, "data": response}
