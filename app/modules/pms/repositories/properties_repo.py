@@ -278,39 +278,45 @@ class PropertyRepository:
         """
         Fetches a paginated list of properties and the total count for a tenant.
         """
-        # Query to fetch the list of properties
-        query = (
-            select(Property)
-            .where(Property.tenant_id == tenant_id)
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await self.db.execute(query)
-        properties = result.scalars().all()
+        try:
+            # Query to fetch the list of properties
+            query = (
+                select(Property)
+                .where(Property.tenant_id == tenant_id)
+                .offset(skip)
+                .limit(limit)
+            )
+            result = await self.db.execute(query)
+            properties = result.scalars().all()
 
-        # Query to fetch the total count for pagination metadata
-        count_query = (
-            select(func.count())
-            .select_from(Property)
-            .where(Property.tenant_id == tenant_id)
-        )
-        count_result = await self.db.execute(count_query)
-        total_count = count_result.scalar_one()
+            # Query to fetch the total count for pagination metadata
+            count_query = (
+                select(func.count())
+                .select_from(Property)
+                .where(Property.tenant_id == tenant_id)
+            )
+            count_result = await self.db.execute(count_query)
+            total_count = count_result.scalar_one()
 
-        return properties, total_count
+            return properties, total_count
+        except Exception as e:
+            logger.error(f"[PropertyRepository] Error fetching properties: {str(e)}")
+            raise RepositoryException(internal_detail=str(e))
 
     async def get_all_system_amenities(self) -> Sequence[Amenity]:
         """
         Fetches the complete catalog of master system amenities from the database.
         """
-        logger.info("[AmenityRepository] Fetching full master system amenities catalog")
+        logger.info(
+            "[PropertyRepository] Fetching full master system amenities catalog"
+        )
         try:
             stmt = select(Amenity).order_by(Amenity.name.asc())
             result = await self.db.execute(stmt)
             return result.scalars().all()
         except Exception as e:
             logger.error(
-                f"[AmenityRepository] Failed to fetch system amenities: {str(e)}"
+                f"[PropertyRepository] Failed to fetch system amenities: {str(e)}"
             )
             raise RepositoryException(f"Failed to load system master options: {str(e)}")
 
@@ -321,7 +327,7 @@ class PropertyRepository:
         Fetches the full Amenity records belonging specifically to this property's array.
         """
         logger.info(
-            f"[AmenityRepository] Resolving amenities for property: {amenity_ids}"
+            f"[PropertyRepository] Resolving amenities for property: {amenity_ids}"
         )
         try:
             if not amenity_ids:
@@ -332,6 +338,6 @@ class PropertyRepository:
             return result.scalars().all()
         except Exception as e:
             logger.error(
-                f"[AmenityRepository] Failed to resolve amenities for property: {str(e)}"
+                f"[PropertyRepository] Failed to resolve amenities for property: {str(e)}"
             )
             raise RepositoryException(f"Failed to load system master options: {str(e)}")
