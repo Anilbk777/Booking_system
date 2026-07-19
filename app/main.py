@@ -18,7 +18,7 @@ from app.modules.pms.routers.room_routers import router as room_router
 from app.modules.pms.routers.tenants_routers import router as tenant_router
 from app.modules.pms.routers.offers_routers import router as offer_router
 
-# from app.modules.pms.routers.image_routers import router as image_router
+from app.modules.pms.routers.image_routers import router as image_router
 from app.modules.pms.routers.discount_code_router import router as discount_code_router
 
 from app.modules.booking.models import *
@@ -60,7 +60,7 @@ app.include_router(property_router)
 app.include_router(room_router)
 app.include_router(offer_router)
 app.include_router(discount_code_router)
-# app.include_router(image_router)
+app.include_router(image_router)
 
 
 @app.get("/")

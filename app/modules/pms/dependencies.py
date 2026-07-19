@@ -30,14 +30,16 @@ def get_tenant_service(db=Depends(get_db)) -> TenantService:
 
 def get_property_service(db=Depends(get_db)) -> PropertyService:
     return PropertyService(
-        property_repo=PropertyRepository(db=db, image_service=get_image_service())
+        property_repo=PropertyRepository(db=db),
+        image_service=get_image_service(),
     )
 
 
 def get_room_service(db=Depends(get_db)) -> RoomService:
     return RoomService(
-        RoomRepository(db=db, image_service=get_image_service()),
-        PropertyRepository(db=db, image_service=get_image_service()),
+        room_repo=RoomRepository(db=db),
+        property_repo=PropertyRepository(db=db),
+        image_service=get_image_service(),
     )
 
 

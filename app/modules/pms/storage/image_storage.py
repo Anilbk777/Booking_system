@@ -2,6 +2,7 @@ import uuid
 import aiofiles
 import asyncio
 import cloudinary.uploader
+import cloudinary.api
 from abc import ABC, abstractmethod
 from pathlib import Path
 from dotenv import load_dotenv
@@ -17,6 +18,11 @@ logger = LoggerFactory.get_logger(__name__)
 class ImageStorageStrategy(ABC):
     @abstractmethod
     async def save_image(self, folder_name: str, image_bytes: bytes) -> str:
+        pass
+
+    @abstractmethod
+    async def rename_image(self, old_public_id: str, new_public_id: str) -> dict:
+        """Rename/move an image to a new path. Returns dict with 'url' and 'public_id'."""
         pass
 
 
@@ -43,6 +49,13 @@ class LocalImageStorage(ImageStorageStrategy):
             logger.error(f"Error saving image to disk: {str(e)}")
             raise ImageStorageException("Error saving image to disk", f"Error saving image to disk: {str(e)}")
 
+    async def rename_image(self, old_public_id: str, new_public_id: str) -> dict:
+        """Local storage rename is a no-op placeholder — not needed for local dev."""
+        logger.warning(
+            f"[LocalImageStorage] rename_image called but not supported locally: {old_public_id} -> {new_public_id}"
+        )
+        return {"url": old_public_id, "public_id": new_public_id}
+
 
 class CloudinaryImageStorage(ImageStorageStrategy):
     def __init__(self):
@@ -54,8 +67,6 @@ class CloudinaryImageStorage(ImageStorageStrategy):
         )
     
     async def save_image(self, folder_name: str, image_bytes: bytes) -> str:
-        # Cloudinary's upload is synchronous and involves network I/O.
-        # We offload it to a thread so it doesn't block the FastAPI event loop.
         logger.info(f"[CloudinaryImageStorage] Uploading image to Cloudinary in {folder_name} folder")
         try:
             def _upload_to_cloudinary():
@@ -81,13 +92,12 @@ class CloudinaryImageStorage(ImageStorageStrategy):
     async def rename_image(self, old_public_id: str, new_public_id: str) -> dict:
         try:
             def _rename():
-         
                 return cloudinary.uploader.rename(
-                    old_public_id,       # e.g. "/properties/9f3a.../wtjpjac0..."
-                    new_public_id,       # e.g. "/properties/a1b2.../wtjpjac0..."
+                    old_public_id,
+                    new_public_id,
                     resource_type="image",
-                    overwrite=True,      # if something already exists at new_public_id, replace it
-                    invalidate=True,     # purge any CDN-cached copy of the old URL
+                    overwrite=True,   # if destination already exists, replace it
+                    invalidate=True,  # purge CDN cache of the old URL
                 )
 
             response = await asyncio.to_thread(_rename)
@@ -97,8 +107,37 @@ class CloudinaryImageStorage(ImageStorageStrategy):
                 "public_id": response.get("public_id"),
             }
         except Exception as e:
-            logger.error(f"Error renaming image {old_public_id} -> {new_public_id}: {str(e)}")
-            raise ImageStorageException("Error renaming image", str(e))
+            error_msg = str(e)
+
+            # ── Idempotent promotion ──────────────────────────────────────────
+            # "Resource not found" means the source (temp/) no longer exists.
+            # This happens when the image was already promoted in a previous
+            # (partially successful) request. In that case, check whether the
+            # permanent destination already exists and return it directly.
+            if "Resource not found" in error_msg or "resource not found" in error_msg.lower():
+                logger.warning(
+                    f"[CloudinaryImageStorage] Source not found during rename "
+                    f"({old_public_id}). Checking if destination already exists..."
+                )
+                try:
+                    def _check_destination():
+                        return cloudinary.api.resource(new_public_id, resource_type="image")
+
+                    resource_info = await asyncio.to_thread(_check_destination)
+                    if resource_info and resource_info.get("secure_url"):
+                        logger.info(
+                            f"[CloudinaryImageStorage] Image already at permanent path: {new_public_id}"
+                        )
+                        return {
+                            "url": resource_info["secure_url"],
+                            "public_id": resource_info["public_id"],
+                        }
+                except Exception:
+                    # Destination also doesn't exist — fall through to original error
+                    pass
+
+            logger.error(f"Error renaming image {old_public_id} -> {new_public_id}: {error_msg}")
+            raise ImageStorageException("Error renaming image", error_msg)
     
     async def delete_temp_assets(self,public_id:str)->dict:
         try:

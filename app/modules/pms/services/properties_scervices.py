@@ -22,18 +22,22 @@ from app.utils.exceptions import (
     PropertyNotFoundException,
     RepositoryException,
     ServiceException,
-
     AmenityNotFoundException,
     ResourceConflictException,
+    ImageStorageException,
 )
+
+from app.modules.pms.services.image_services import ImageService
+
 from app.utils.logging import LoggerFactory
 
 logger = LoggerFactory.get_logger(__name__)
 
 
 class PropertyService:
-    def __init__(self, property_repo: PropertyRepository):
+    def __init__(self, property_repo: PropertyRepository, image_service: ImageService):
         self.property_repo = property_repo
+        self.image_service = image_service
 
     async def create_general_information(
         self, payload: GeneralPropertyInfo, tenant_id: uuid.UUID
@@ -154,7 +158,30 @@ class PropertyService:
                     f"These custom amenities already exist for this property: {conflict_str}"
                 )
 
-            # ── All checks passed — persist to DB ───────────────────────────
+            # ── All checks passed — promote temp images → permanent paths ──────
+            photos_data = payload_dict.get("photos", {})
+            cover_url: str | None = photos_data.get("cover")
+            gallery_urls: list[str] = photos_data.get("gallery", [])
+
+            # Collect all non-None URLs for batch promotion
+            all_urls_to_promote = []
+            if cover_url:
+                all_urls_to_promote.append(cover_url)
+            all_urls_to_promote.extend(gallery_urls)
+
+            if all_urls_to_promote:
+                promoted_urls = await self.image_service.promote_temp_images(
+                    urls=all_urls_to_promote,
+                    property_id=str(property_id),
+                    tenant_id=str(tenant_id),
+                )
+                # Reassemble the photos dict with promoted URLs (preserving order)
+                promoted_iter = iter(promoted_urls)
+                if cover_url:
+                    payload_dict["photos"]["cover"] = next(promoted_iter)
+                payload_dict["photos"]["gallery"] = [next(promoted_iter) for _ in gallery_urls]
+
+            # ── Persist to DB with permanent URLs ────────────────────────────
             property_obj = await self.property_repo.create_photos_and_amenities(
                 property_id, tenant_id, payload_dict
             )
@@ -165,6 +192,7 @@ class PropertyService:
             RepositoryException,
             AmenityNotFoundException,
             ResourceConflictException,
+            ImageStorageException,
         ):
             raise
         except Exception as e:
@@ -230,7 +258,7 @@ class PropertyService:
                 tenant_id=tenant_id, skip=skip, limit=limit
             )
             formatted_properties = []
-        
+
             # Iterate through each property independently
             for prop in properties:
                 db_amenities = await self.property_repo.resolve_amenities_for_property(
@@ -246,17 +274,17 @@ class PropertyService:
                 prop_data = {
                     **{c.name: getattr(prop, c.name) for c in prop.__table__.columns},
                     # FIX: Change 'system_amenity_ids' to 'system_amenities'
-                    "system_amenities": property_system_amenities, 
+                    "system_amenities": property_system_amenities,
                     "custom_amenities": prop.custom_amenities or [],
-                    "photos": prop.photos or {"cover": None, "gallery": []}
+                    "photos": prop.photos or {"cover": None, "gallery": []},
                 }
-                
+
                 formatted_properties.append(PropertyResponse.model_validate(prop_data))
 
             return TenantPropertiesListResponse(
                 tenant_id=tenant_id,
                 total_count=total_count,
-                properties=formatted_properties
+                properties=formatted_properties,
             )
         except RepositoryException:
             raise

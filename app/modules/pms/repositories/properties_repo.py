@@ -1,4 +1,3 @@
-from app.modules.pms.services.image_services import ImageService
 import uuid
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -20,9 +19,8 @@ logger = LoggerFactory.get_logger(__name__)
 
 
 class PropertyRepository:
-    def __init__(self, db: AsyncSession, image_service: ImageService):
+    def __init__(self, db: AsyncSession):
         self.db = db
-        self.image_service = image_service
 
     async def get_property_by_id(
         self, property_id: uuid.UUID, tenant_id: uuid.UUID

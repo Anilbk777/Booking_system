@@ -1,7 +1,7 @@
 import asyncio
 from fastapi import UploadFile
 from app.utils.imgae_utils import process_image
-from app.modules.pms.storage.base_storage import StorageFactory
+from app.modules.pms.storage.image_storage import StorageFactory
 from app.utils.exceptions import (
     ServiceException,
     ImageStorageException,
@@ -65,6 +65,67 @@ class ImageService:
             raise ServiceException(f"Error processing or uploading image: {str(e)}")
         finally:
             await file.close()
+
+    async def promote_temp_images(
+        self,
+        urls: list[str],
+        property_id: str,
+        tenant_id: str,
+    ) -> list[str]:
+        """
+        Promotes a list of image URLs from temp/ to their permanent Cloudinary paths.
+
+        For each URL:
+          - If it does NOT contain '/temp/', it is already permanent → return as-is.
+          - If it contains '/temp/', rename it in Cloudinary by stripping 'temp/' from
+            the public_id, and replacing the fake_property_id folder with the real property_id.
+
+        Temp public_id format:
+            temp/{tenant_id}/properties/{property_id}/{filename}
+        Permanent public_id format:
+            {tenant_id}/properties/{property_id}/{filename}
+
+        Returns the list of permanent URLs in the same order as input.
+        Skips None/empty values transparently.
+        """
+        # ── Deduplicate before hitting Cloudinary ──────────────────────────
+        # The same URL may appear as both cover and in gallery. Promoting the
+        # same temp file twice concurrently causes "Resource not found" on the
+        # second attempt because the file has already been moved by the first.
+        unique_urls = list(dict.fromkeys(url for url in urls if url))  # preserve order, skip None
+
+        async def _promote_one(url: str) -> str:
+            if "/temp/" not in url:
+                # Already a permanent URL — pass through unchanged
+                return url
+
+            old_public_id = self.extract_public_id_from_url(url)
+            new_public_id = old_public_id.replace("temp/", "", 1)
+
+            logger.info(
+                f"[ImageService] Promoting image: {old_public_id} -> {new_public_id}"
+            )
+            result = await self.provider.rename_image(old_public_id, new_public_id)
+            return result["url"]
+
+        tasks = [_promote_one(url) for url in unique_urls]
+        promoted_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Build a mapping from original temp URL → promoted permanent URL
+        url_map: dict[str, str] = {}
+        for original, result in zip(unique_urls, promoted_results):
+            if isinstance(result, Exception):
+                logger.error(
+                    f"[ImageService] Failed to promote image {original}: {result}"
+                )
+                raise ImageStorageException(
+                    "Failed to promote one or more images from temp storage.",
+                    internal_detail=str(result),
+                )
+            url_map[original] = result
+
+        # Reconstruct the output list in the original order
+        return [url_map[url] if url else url for url in urls]
 
     def extract_fake_id_from_public_id(self, public_id: str, segment: str) -> str:
         """
