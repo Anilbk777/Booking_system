@@ -1,5 +1,6 @@
 from app.modules.pms.schemas.room_schemas import RoomTypeCreate
 import uuid
+import asyncio
 
 from app.modules.pms.repositories.properties_repo import PropertyRepository
 from app.modules.pms.repositories.room_repo import RoomRepository
@@ -42,6 +43,52 @@ class RoomService:
         self.room_repo = room_repo
         self.property_repo = property_repo
         self.image_service = image_service
+
+    async def _promote_room_images_if_any(
+        self, rooms_data: list[dict], property_id: uuid.UUID
+    ) -> None:
+        try:
+            tasks = []
+
+            async def _promote_single_room(room: dict):
+                real_room_id = uuid.uuid4()
+                room["id"] = real_room_id
+
+                photos_data = room.get("photos", {})
+                if not photos_data:
+                    return
+
+                cover_url = photos_data.get("cover")
+                gallery_urls = photos_data.get("gallery", [])
+
+                urls_to_promote = []
+                if cover_url:
+                    urls_to_promote.append(cover_url)
+                urls_to_promote.extend(gallery_urls)
+
+                if urls_to_promote:
+                    promoted_urls = await self.image_service.promote_room_temp_images(
+                        urls=urls_to_promote,
+                        property_id=str(property_id),
+                        real_room_id=str(real_room_id),
+                    )
+                    promoted_iter = iter(promoted_urls)
+                    if cover_url:
+                        room["photos"]["cover"] = next(promoted_iter)
+                    room["photos"]["gallery"] = [
+                        next(promoted_iter) for _ in gallery_urls
+                    ]
+
+            for room in rooms_data:
+                tasks.append(_promote_single_room(room))
+
+            if tasks:
+                await asyncio.gather(*tasks)
+        except ImageStorageException:
+            raise
+        except Exception as e:
+            logger.error(f"[RoomService] Error promoting room images: {str(e)}")
+            raise ServiceException(str(e))
 
     async def _validate_property(self, property_id: uuid.UUID, tenant_id: uuid.UUID):
         property_obj = await self.property_repo.get_property_by_id(
@@ -94,6 +141,10 @@ class RoomService:
                 raise RoomNameAlreadyExistsException(
                     f"Room name(s) already exists: {[room.room_name for room in existing_room_names]}"
                 )
+
+            # Promote temporary room images to their permanent paths
+            await self._promote_room_images_if_any(rooms_data, property_obj.id)
+
             created_rooms = await self.room_repo.create_rooms(
                 property_obj.id, rooms_data
             )

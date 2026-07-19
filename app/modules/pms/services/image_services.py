@@ -127,6 +127,56 @@ class ImageService:
         # Reconstruct the output list in the original order
         return [url_map[url] if url else url for url in urls]
 
+    async def promote_room_temp_images(
+        self,
+        urls: list[str],
+        property_id: str,
+        real_room_id: str,
+    ) -> list[str]:
+        """
+        Promotes room images from temp/ to their permanent paths.
+        
+        Temp path format:
+            temp/properties/{property_id}/rooms/{fake_room_id}/{filename}
+        Permanent path format:
+            properties/{property_id}/rooms/{real_room_id}/{filename}
+        """
+        unique_urls = list(dict.fromkeys(url for url in urls if url))
+
+        async def _promote_one(url: str) -> str:
+            if "/temp/" not in url:
+                return url
+
+            old_public_id = self.extract_public_id_from_url(url)
+            fake_room_id = self.extract_fake_id_from_public_id(old_public_id, "rooms")
+
+            # Replace temp/ and swap the fake_room_id with real_room_id
+            new_public_id = old_public_id.replace("temp/", "", 1)
+            new_public_id = new_public_id.replace(fake_room_id, real_room_id, 1)
+
+            logger.info(
+                f"[ImageService] Promoting room image: {old_public_id} -> {new_public_id}"
+            )
+            result = await self.provider.rename_image(old_public_id, new_public_id)
+            return result["url"]
+
+        tasks = [_promote_one(url) for url in unique_urls]
+        promoted_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        url_map: dict[str, str] = {}
+        for original, result in zip(unique_urls, promoted_results):
+            if isinstance(result, Exception):
+                logger.error(
+                    f"[ImageService] Failed to promote room image {original}: {result}"
+                )
+                raise ImageStorageException(
+                    "Failed to promote one or more room images from temp storage.",
+                    internal_detail=str(result),
+                )
+            url_map[original] = result
+
+        return [url_map[url] if url else url for url in urls]
+
     def extract_fake_id_from_public_id(self, public_id: str, segment: str) -> str:
         """
         public_id looks like:
