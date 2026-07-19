@@ -1,5 +1,3 @@
-from app.modules.pms.models import properties_model
-from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
 from app.modules.pms.repositories.properties_repo import PropertyRepository
@@ -24,11 +22,7 @@ from app.utils.exceptions import (
     PropertyNotFoundException,
     RepositoryException,
     ServiceException,
-    UnauthorizedException,
-    DefaultAmenityNotExistsException,
-    InvalidDateException,
-    InvalidImageException,
-    ImageStorageException,
+
     AmenityNotFoundException,
     ResourceConflictException,
 )
@@ -296,4 +290,20 @@ class PropertyService:
             )
             raise ServiceException(
                 internal_detail=f"Failed to get all system amenities: {str(e)}"
+            )
+
+    async def delete_property(
+        self,
+        property_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+    ):
+        logger.info(f"[PropertyService] deleting property {property_id}")
+        try:
+            await self.property_repo.delete_property(property_id, tenant_id)
+        except (PropertyNotFoundException, RepositoryException):
+            raise
+        except Exception as e:
+            logger.error(f"[PropertyService] Error deleting property: {str(e)}")
+            raise ServiceException(
+                internal_detail=f"Failed to delete property: {str(e)}"
             )

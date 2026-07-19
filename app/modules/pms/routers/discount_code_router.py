@@ -6,7 +6,7 @@ from app.modules.auth.auth_middlewares import CurrentUser
 from app.utils.schemas import StandardResponse
 from app.modules.pms.dependencies import get_discount_code_service
 
-router = APIRouter(prefix="/pms/properties/{property_id}/discount-codes", tags=["Discount Codes"])
+router = APIRouter(prefix="/properties/{property_id}/discount-codes", tags=["Discount Codes"])
 
 @router.post("/", response_model=StandardResponse[DiscountCodeResponse], status_code=status.HTTP_201_CREATED)
 async def create_discount_code(

@@ -7,16 +7,18 @@ from app.modules.pms.dependencies import get_special_offer_service, get_room_ser
 from app.modules.pms.schemas.offers_schema import (
     SpecialOffersCreate,
     SpecialOfferResponse,
-    SpecialOfferBase,
+    SpecialOfferUpdate,
 )
 from app.utils.schemas import StandardResponse
 from app.modules.pms.services.offers_services import SpecialOfferService
 
-router = APIRouter(prefix="/pms", tags=["Special Offers"])
+router = APIRouter(
+    prefix="/properties/{property_id}/special-offers", tags=["Special Offers"]
+)
 
 
 @router.post(
-    "/{property_id}/special-offers",
+    "/",
     response_model=StandardResponse[List[SpecialOfferResponse]],
     status_code=status.HTTP_201_CREATED,
 )
@@ -44,7 +46,7 @@ async def bulk_create_special_offers(
 
 
 @router.get(
-    "/{property_id}/special-offers",
+    "/",
     response_model=StandardResponse[List[SpecialOfferResponse]],
     status_code=status.HTTP_200_OK,
 )
@@ -68,9 +70,13 @@ async def get_property_special_offers(
     return {"success": True, "data": formatted_offers}
 
 
-@router.get("/{property_id}/special-offers/{offer_id}", response_model=StandardResponse[SpecialOfferResponse],status_code=status.HTTP_200_OK,)
+@router.get(
+    "/{offer_id}",
+    response_model=StandardResponse[SpecialOfferResponse],
+    status_code=status.HTTP_200_OK,
+)
 async def get_special_offer(
-    property_id:uuid.UUID,
+    property_id: uuid.UUID,
     offer_id: uuid.UUID,
     user: CurrentUser,
     offer_service: SpecialOfferService = Depends(get_special_offer_service),
@@ -80,20 +86,21 @@ async def get_special_offer(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You are not authorized to get special offers. You must belong to a tenant.",
         )
-    offer = await offer_service.get_offer_by_id(offer_id=offer_id, property_id=property_id)
+    offer = await offer_service.get_offer_by_id(
+        offer_id=offer_id, property_id=property_id
+    )
     return {"success": True, "data": offer}
 
 
-
 @router.patch(
-    "/{property_id}/special-offers/{offer_id}",
+    "/{offer_id}",
     response_model=StandardResponse[SpecialOfferResponse],
     status_code=status.HTTP_200_OK,
 )
 async def update_special_offer(
     property_id: uuid.UUID,
     offer_id: uuid.UUID,
-    payload: SpecialOfferBase,
+    payload: SpecialOfferUpdate,
     user: CurrentUser,
     offer_service: SpecialOfferService = Depends(get_special_offer_service),
     room_service: RoomService = Depends(get_room_service),
@@ -117,9 +124,7 @@ async def update_special_offer(
     return {"success": True, "data": formatted_offer}
 
 
-@router.delete(
-    "/{property_id}/special-offers/{offer_id}"
-)
+@router.delete("/{offer_id}")
 async def delete_special_offer(
     property_id: uuid.UUID,
     offer_id: uuid.UUID,
@@ -137,4 +142,4 @@ async def delete_special_offer(
         offer_id=offer_id,
     )
     if response:
-        return {"success": True, "data": "Offer deleted"}
+        return {"success": True, "data": "Offer deleted successfully"}

@@ -25,10 +25,9 @@ async def handle_app_exception(request: Request, exc: AppBaseException):
         traceback.format_exc(),
     )
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=int(exc.status_code),
         content={"success": False, "error": exc.user_message},
     )
-
 
 
 @app.exception_handler(RequestValidationError)

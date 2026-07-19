@@ -16,14 +16,16 @@ from app.modules.pms.models import *
 from app.modules.pms.routers.properties_routers import router as property_router
 from app.modules.pms.routers.room_routers import router as room_router
 from app.modules.pms.routers.tenants_routers import router as tenant_router
-# from app.modules.pms.routers.offers_routers import router as offer_router
+from app.modules.pms.routers.offers_routers import router as offer_router
+
 # from app.modules.pms.routers.image_routers import router as image_router
-# from app.modules.pms.routers.discount_code_router import router as discount_code_router
+from app.modules.pms.routers.discount_code_router import router as discount_code_router
 
 from app.modules.booking.models import *
 from app.utils.exception_handlers import register_exception_handlers
 
 load_dotenv()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,23 +36,11 @@ async def lifespan(app: FastAPI):
     # shutdown
     await engine.dispose()
 
-
-
-DEFAULT_ORIGINS = [
-    "http://localhost:8000",
-    "http://localhost:5173",
-    "http://localhost:5176",
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-]
-env_origins = os.getenv("ALLOWED_ORIGINS", "")
-env_list = [o.strip() for o in env_origins.split(",") if o.strip()]
-ALLOWED_ORIGINS = list(dict.fromkeys(DEFAULT_ORIGINS + env_list))
-
 app = FastAPI(
     lifespan=lifespan, title="StayEasy API", version="1.0.0", root_path="/api/v1"
 )
 
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -68,9 +58,9 @@ app.include_router(user_router)
 app.include_router(tenant_router)
 app.include_router(property_router)
 app.include_router(room_router)
-# app.include_router(offer_router)
+app.include_router(offer_router)
+app.include_router(discount_code_router)
 # app.include_router(image_router)
-# app.include_router(discount_code_router)
 
 
 @app.get("/")

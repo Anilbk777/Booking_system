@@ -1,9 +1,8 @@
 import uuid
 from decimal import Decimal
-from datetime import time
 from typing import Optional, List, Dict, Any
 from sqlalchemy import (
-    String, ForeignKey, Integer, Boolean, Numeric, Time, 
+    String, ForeignKey, Integer, Boolean, Numeric, 
     UniqueConstraint, Index, CheckConstraint, Enum as SqlEnum
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
@@ -123,9 +122,9 @@ class Property(Base, TimestampMixin):
     bed_types:Mapped[List["BedType"]] = relationship("BedType",back_populates="property",cascade="all,delete-orphan",passive_deletes=True,)
     room_types:Mapped[List["RoomType"]] = relationship("RoomType",back_populates="property",cascade="all,delete-orphan",passive_deletes=True,)
     
-    # special_offers: Mapped[List["SpecialOffer"]] = relationship(
-    #     "SpecialOffer", back_populates="property", cascade="all, delete-orphan", passive_deletes=True
-    # )
+    special_offers: Mapped[List["SpecialOffer"]] = relationship(
+        "SpecialOffer", back_populates="property", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Amenity(Base, TimestampMixin):

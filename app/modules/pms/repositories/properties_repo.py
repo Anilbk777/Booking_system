@@ -1,11 +1,8 @@
 from app.modules.pms.services.image_services import ImageService
 import uuid
-from datetime import date
-from collections import defaultdict
-from sqlalchemy import and_, delete, func, select, or_, not_
-from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
 
 from app.modules.pms.models.properties_model import (
     Amenity,
@@ -17,8 +14,7 @@ from app.utils.exceptions import (
     AmenityNotFoundException,
 )
 from app.utils.logging import LoggerFactory
-from decimal import Decimal
-from typing import Optional, Sequence
+from typing import Sequence
 
 logger = LoggerFactory.get_logger(__name__)
 
@@ -341,3 +337,33 @@ class PropertyRepository:
                 f"[PropertyRepository] Failed to resolve amenities for property: {str(e)}"
             )
             raise RepositoryException(f"Failed to load system master options: {str(e)}")
+
+    async def delete_property(
+        self,
+        property_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+    ) -> None:
+        logger.info(
+            f"[PropertyRepository] Deleting property: {property_id} for tenant: {tenant_id}"
+        )
+        try:
+            result = await self.db.execute(
+                select(Property).where(
+                    Property.id == property_id, Property.tenant_id == tenant_id
+                )
+            )
+            property_obj = result.scalar_one_or_none()
+            if not property_obj:
+                raise PropertyNotFoundException("Property not found or access denied")
+
+            await self.db.delete(property_obj)
+            await self.db.commit()
+            logger.info(
+                f"[PropertyRepository] Deleted property: {property_id} for tenant: {tenant_id}"
+            )
+        except PropertyNotFoundException:
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"[PropertyRepository] Error deleting property: {str(e)}")
+            raise RepositoryException(internal_detail=str(e))

@@ -93,6 +93,22 @@ async def get_property_by_id(
     return {"success": True, "data": response}
 
 
+@router.delete(
+    "/{property_id}",
+    status_code=status.HTTP_200_OK,
+    response_model=StandardResponse,
+)
+async def delete_property(
+    property_id: uuid.UUID,
+    current_user: CurrentUser,
+    property_service: PropertyService = Depends(get_property_service),
+):
+    verify_tenant(current_user)
+    tenant_id = current_user.tenant_id
+    await property_service.delete_property(property_id, tenant_id)
+    return {"success": True, "data": "Property deleted successfully"}
+
+
 @router.post(
     "/{property_id}/create-location",
     response_model=StandardResponse[LocationResponse],

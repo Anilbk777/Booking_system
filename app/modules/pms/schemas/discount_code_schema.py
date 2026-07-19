@@ -22,7 +22,7 @@ class DiscountCodeBase(BaseModel):
         ...,
         title="Code",
         min_length=2,
-        max_length=50,
+        max_length=10,
         pattern=r"^[a-zA-Z0-9_-]+$",
         description="Alphanumeric code",
     )
@@ -83,7 +83,7 @@ class DiscountCodeCreate(DiscountCodeBase):
 
 class DiscountCodeUpdate(BaseModel):
     code: Optional[str] = Field(
-        None, min_length=2, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$"
+        None, min_length=2, max_length=10, pattern=r"^[a-zA-Z0-9_-]+$"
     )
     type: Optional[DiscountType] = None
     discount_value: Optional[float] = Field(None, gt=0)
